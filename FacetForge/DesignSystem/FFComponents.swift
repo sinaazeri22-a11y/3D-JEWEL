@@ -1,6 +1,12 @@
 import Foundation
 import SwiftUI
 
+/// Phase 24's one number for a touch target. Every interactive control keeps
+/// at least this square, even when its glyph or label is smaller.
+enum FFHitTarget {
+    static let minimum: CGFloat = 44
+}
+
 // MARK: - Button
 
 struct FFButton: View {
@@ -28,7 +34,7 @@ struct FFButton: View {
             }
             .font(FFType.label)
             .foregroundStyle(foreground)
-            .frame(minHeight: 44)
+            .frame(minWidth: FFHitTarget.minimum, minHeight: FFHitTarget.minimum)
             .padding(.horizontal, FFSpace.md)
             .background(background, in: RoundedRectangle(cornerRadius: FFRadius.md, style: .continuous))
             .overlay {
@@ -90,7 +96,9 @@ struct FFChip: View {
             }
             .font(FFType.caption)
             .foregroundStyle(isSelected ? FFPalette.onAccent.color : FFPalette.textSecondary.color)
-            .frame(minHeight: 44)
+            // A short label such as "Box" or "1-up" must not shrink below a
+            // finger-sized target just because its text is narrow.
+            .frame(minWidth: FFHitTarget.minimum, minHeight: FFHitTarget.minimum)
             .padding(.horizontal, FFSpace.sm)
             .background(
                 isSelected ? FFPalette.accent.color : FFPalette.raised.color,
@@ -125,6 +133,9 @@ struct FFField: View {
                     .foregroundStyle(FFPalette.textPrimary.color)
                     .keyboardType(.decimalPad)
                     .textFieldStyle(.plain)
+                    // The field, not only its surrounding capsule, is the
+                    // hit target the audit walks.
+                    .frame(minHeight: FFHitTarget.minimum)
                     .accessibilityLabel(label)
 
                 if let unit {

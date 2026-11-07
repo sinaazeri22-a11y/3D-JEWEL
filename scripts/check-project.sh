@@ -53,6 +53,8 @@ required = [
     "FacetForge/Document/FFLayer.swift",
     "FacetForge/Measure/FFMeasurement.swift",
     "FacetForge/UI/FFMeasurementOverlay.swift",
+    "FacetForge/UI/FFTouchArbitration.swift",
+    "FacetForge/UI/FFSnapHaptics.swift",
     "FacetForge/Assets.xcassets/Contents.json",
     "FacetForge/Assets.xcassets/AccentColor.colorset/Contents.json",
     "FacetForgeTests/AppIdentityTests.swift",
@@ -71,6 +73,7 @@ required = [
     "FacetForgeTests/Phase18DisplayModeTests.swift",
     "FacetForgeTests/Phase19MeasurementTests.swift",
     "FacetForgeTests/Phase20LayerTests.swift",
+    "FacetForgeTests/Phase24TouchTests.swift",
     "FacetForgeUITests/LaunchTests.swift",
     "FacetForgeUITests/GalleryTests.swift",
     "FacetForgeUITests/AdaptiveShellTests.swift",
@@ -78,6 +81,7 @@ required = [
     "FacetForgeUITests/ViewportLayoutUITests.swift",
     "FacetForgeUITests/DisplayModeUITests.swift",
     "FacetForgeUITests/LayerPanelUITests.swift",
+    "FacetForgeUITests/Phase24HitTargetUITests.swift",
 ]
 for rel in required:
     if not (root / rel).exists():
@@ -163,6 +167,8 @@ if project.exists():
         "A10000000000000000000060 /* FFMeasurement.swift in Sources */",
         "A10000000000000000000062 /* FFMeasurementOverlay.swift in Sources */",
         "A10000000000000000000065 /* FFLayer.swift in Sources */",
+        "A1000000000000000000006C /* FFTouchArbitration.swift in Sources */",
+        "A1000000000000000000006E /* FFSnapHaptics.swift in Sources */",
         "A20000000000000000000023 /* DocumentTests.swift in Sources */",
         "A20000000000000000000025 /* Phase13ViewportTests.swift in Sources */",
         "A2000000000000000000001D /* RenderTests.swift in Sources */",
@@ -178,6 +184,8 @@ if project.exists():
         "A20000000000000000000033 /* Phase20LayerTests.swift in Sources */",
         "A3000000000000000000001D /* DisplayModeUITests.swift in Sources */",
         "A3000000000000000000001F /* LayerPanelUITests.swift in Sources */",
+        "A2000000000000000000003B /* Phase24TouchTests.swift in Sources */",
+        "A30000000000000000000025 /* Phase24HitTargetUITests.swift in Sources */",
         "PRODUCT_BUNDLE_IDENTIFIER = com.shahroodazerov.facetforge.tests;",
         "PRODUCT_BUNDLE_IDENTIFIER = com.shahroodazerov.facetforge.uitests;",
         'TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FacetForge.app/FacetForge";',

@@ -1231,6 +1231,21 @@ extension FFMetalViewportRenderer: ViewportRendering {
     }
 }
 
+/// The MTKView subclass exists for one reason: `maximumFramesPerSecond` is only
+/// meaningful once the view has a window and therefore a screen.
+final class FFMetalView: MTKView {
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        applyDisplayPacing()
+    }
+
+    func applyDisplayPacing() {
+        preferredFramesPerSecond = FFDisplayPacing.preferredFramesPerSecond(
+            maximumFramesPerSecond: window?.screen.maximumFramesPerSecond
+        )
+    }
+}
+
 /// SwiftUI host for the Metal viewport. It rebuilds no renderer on every
 /// camera update: the coordinator owns the device pipeline and only swaps the
 /// camera value. Phase 10 adds the gesture layer; every gesture goes through
@@ -1280,12 +1295,16 @@ struct FFMetalViewportView: UIViewRepresentable {
             return Self.makeUnavailableView()
         }
 
-        let view = MTKView(frame: .zero, device: renderer.device)
+        let view = FFMetalView(frame: .zero, device: renderer.device)
         view.colorPixelFormat = renderer.pixelFormat
         view.depthStencilPixelFormat = FFMetalViewportRenderer.depthPixelFormat
         view.sampleCount = renderer.sampleCount
         view.clearColor = FFMetalViewportRenderer.clearColor(for: mode)
-        view.preferredFramesPerSecond = 60
+        // At creation there is no screen yet, so this is the safe floor. The
+        // subclass raises it to the panel's 120 Hz in `didMoveToWindow`.
+        view.preferredFramesPerSecond = FFDisplayPacing.preferredFramesPerSecond(
+            maximumFramesPerSecond: nil
+        )
         view.isPaused = false
         view.enableSetNeedsDisplay = false
         view.autoResizeDrawable = true
@@ -1318,6 +1337,7 @@ struct FFMetalViewportView: UIViewRepresentable {
         context.coordinator.scene = scene
         context.coordinator.mode = mode
         context.coordinator.pickFilter = pickFilter
+        (uiView as? FFMetalView)?.applyDisplayPacing()
         (uiView as? MTKView)?.clearColor = FFMetalViewportRenderer.clearColor(for: mode)
         context.coordinator.onCameraChange = onCameraChange
         context.coordinator.onPick = onPick
@@ -1370,6 +1390,9 @@ struct FFMetalViewportView: UIViewRepresentable {
         private(set) var pickInteraction = FFPickInteraction()
         private weak var metalView: MTKView?
         private var lastReportTime: Double = 0
+        private var arbitration = FFTouchArbitration()
+        private weak var panRecognizer: UIPanGestureRecognizer?
+        private weak var pickTapRecognizer: FFTouchTapGestureRecognizer?
 
         init(
             camera: FFCamera,
@@ -1407,12 +1430,29 @@ struct FFMetalViewportView: UIViewRepresentable {
         /// covers both touch and trackpad zoom. A two-finger double tap frames
         /// the scene, matching the desktop shortcut a jeweller already knows.
         func installGestures(on view: MTKView) {
+            // The observer is installed first and stays enabled while the
+            // camera recognisers are suspended for a gizmo drag, so the
+            // arbitration state cannot go stale across that boundary.
+            let observer = FFTouchContactObserver()
+            observer.delegate = self
+            observer.cancelsTouchesInView = false
+            observer.delaysTouchesBegan = false
+            observer.delaysTouchesEnded = false
+            observer.onBegin = { [weak self] id, kind in
+                self?.arbitration.begin(id: id, kind: kind)
+            }
+            observer.onEnd = { [weak self] id in
+                self?.arbitration.end(id: id)
+            }
+            view.addGestureRecognizer(observer)
+
             let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
             pan.maximumNumberOfTouches = 2
             pan.allowedScrollTypesMask = .all
             pan.delegate = self
             pan.cancelsTouchesInView = false
             view.addGestureRecognizer(pan)
+            panRecognizer = pan
 
             let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
             pinch.delegate = self
@@ -1425,10 +1465,14 @@ struct FFMetalViewportView: UIViewRepresentable {
             frameTap.delegate = self
             view.addGestureRecognizer(frameTap)
 
-            let pickTap = UITapGestureRecognizer(target: self, action: #selector(handlePickTap(_:)))
+            let pickTap = FFTouchTapGestureRecognizer(
+                target: self,
+                action: #selector(handlePickTap(_:))
+            )
             pickTap.numberOfTapsRequired = 1
             pickTap.delegate = self
             view.addGestureRecognizer(pickTap)
+            pickTapRecognizer = pickTap
 
             let hover = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
             hover.delegate = self
@@ -1454,25 +1498,37 @@ struct FFMetalViewportView: UIViewRepresentable {
             recognizer.setTranslation(.zero, in: view)
 
             let isIndirect = recognizer.numberOfTouches == 0
-            let isTwoFinger = recognizer.numberOfTouches >= 2
             guard translation != .zero else { return }
+
+            // The arbiter, not the recogniser's touch count, decides whether
+            // this delta is a camera move. A Pencil, a palm or a resting hand
+            // returns `.none` here and the translation is discarded.
+            let intent = arbitration.cameraIntent(
+                isIndirect: isIndirect,
+                touchCount: recognizer.numberOfTouches
+            )
+            guard intent != .none else { return }
 
             var next = camera
             let delta = Vec2(x: Double(translation.x), y: Double(translation.y))
-            if isIndirect || isTwoFinger {
+            switch intent {
+            case .pan:
                 FFCameraNavigation.pan(
                     &next,
                     screenDelta: delta,
                     viewport: viewportSize(of: view)
                 )
-            } else {
+            case .orbit:
                 FFCameraNavigation.orbit(&next, screenDelta: delta)
+            case .none:
+                return
             }
             publish(next, in: view)
         }
 
         @objc private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
             guard let view = metalView, recognizer.state == .changed else { return }
+            guard !arbitration.cameraCommandBlocked else { return }
             let factor = Double(recognizer.scale)
             recognizer.scale = 1
             guard abs(factor - 1) > 1e-4 else { return }
@@ -1490,6 +1546,7 @@ struct FFMetalViewportView: UIViewRepresentable {
 
         @objc private func handleFrameTap(_ recognizer: UITapGestureRecognizer) {
             guard let view = metalView, recognizer.state == .ended else { return }
+            guard !arbitration.cameraCommandBlocked else { return }
             var next = camera
             FFCameraNavigation.frameAll(&next)
             publish(next, in: view)
@@ -1517,10 +1574,11 @@ struct FFMetalViewportView: UIViewRepresentable {
         /// A tap resolves through the ID buffer and publishes the hover result.
         /// The drag gesture keeps its own pick, so a moving finger cannot be
         /// re-targeted by a hover event.
-        @objc private func handlePickTap(_ recognizer: UITapGestureRecognizer) {
+        @objc private func handlePickTap(_ recognizer: FFTouchTapGestureRecognizer) {
             guard let view = metalView,
                   recognizer.state == .ended,
-                  let renderer
+                  let renderer,
+                  arbitration.selectionAllowed(kind: recognizer.firstTouchKind)
             else { return }
             let location = recognizer.location(in: view)
             let hoverCallback = onHover
@@ -1562,6 +1620,25 @@ struct FFMetalViewportView: UIViewRepresentable {
             shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
         ) -> Bool {
             true
+        }
+
+        /// Refuse a contact before the recogniser starts tracking it. This is
+        /// what keeps a direct tap that lands while the Pencil is down out of
+        /// the pick path entirely; the pan has a second veto in `handlePan`
+        /// because a Pencil can land after a finger gesture has begun.
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldReceive touch: UITouch
+        ) -> Bool {
+            let kind = FFTouchKind(touch: touch)
+            if gestureRecognizer === pickTapRecognizer {
+                return arbitration.selectionAllowed(kind: kind)
+            }
+            if gestureRecognizer === panRecognizer {
+                if kind == .pencil { return false }
+                if kind == .finger, arbitration.pencilActive { return false }
+            }
+            return true
         }
 
         func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {

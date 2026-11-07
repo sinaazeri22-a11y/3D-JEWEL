@@ -2,6 +2,21 @@ import Foundation
 import os
 import SwiftUI
 
+/// Phase 24's ProMotion rule. A 120 Hz iPad gets 120; a 60 Hz iPad or a
+/// simulator that reports no usable maximum stays at 60; a pathological
+/// report above the panel ceiling is clamped rather than trusted.
+enum FFDisplayPacing {
+    static let minimumFramesPerSecond = 60
+    static let maximumFramesPerSecond = 120
+
+    static func preferredFramesPerSecond(maximumFramesPerSecond: Int?) -> Int {
+        guard let maximum = maximumFramesPerSecond,
+              maximum >= minimumFramesPerSecond
+        else { return minimumFramesPerSecond }
+        return min(maximum, maximumFramesPerSecond)
+    }
+}
+
 /// What one encoded render pass submitted. The renderer increments these at
 /// each draw call, so the numbers the overlay shows are the frame that reached
 /// Metal rather than a parallel estimate. Line draws count as draw calls and

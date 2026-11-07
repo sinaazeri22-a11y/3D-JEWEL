@@ -1,6 +1,14 @@
 import Foundation
 import SwiftUI
 
+/// Phase 24's gizmo targets. The plane keeps its 24 pt picture but gains a
+/// 44 pt hit area; the arrows already use 44 pt and are drawn last so they win
+/// wherever the two overlap.
+enum FFGumballHitTarget {
+    static let minimum = FFHitTarget.minimum
+    static let planeVisual: CGFloat = 24
+}
+
 /// Screen-space gizmo over the single Metal pane. Handles are projected from
 /// the same camera the renderer uses, so the arrow a user grabs is the arrow
 /// the picture shows. The model state lives in `FFGumballSession`; this view
@@ -27,6 +35,9 @@ struct FFGumballOverlay: View {
     /// One key per gesture, so repeated commit reports coalesce into one step
     /// while two separate drags stay two steps.
     @State private var dragKey = UUID().uuidString
+    /// Haptics are driven by the snapped transform, not by the raw finger
+    /// sample, so a sub-step wobble cannot buzz.
+    @State private var snapHaptics = FFSnapHapticDriver()
 
     private var viewportVector: Vec2 {
         Vec2(x: Double(viewport.width), y: Double(viewport.height))
@@ -113,9 +124,9 @@ struct FFGumballOverlay: View {
                         .frame(width: 12, height: 12)
                     Circle()
                         .fill(axisColor(axis).opacity(0.001))
-                        .frame(width: 44, height: 44)
+                        .frame(width: FFGumballHitTarget.minimum, height: FFGumballHitTarget.minimum)
                 }
-                .frame(width: 44, height: 44)
+                .frame(width: FFGumballHitTarget.minimum, height: FFGumballHitTarget.minimum)
                 .contentShape(Circle())
                 .position(x: tip.x, y: tip.y)
                 .gesture(axisDrag(axis))
@@ -141,7 +152,14 @@ struct FFGumballOverlay: View {
                         RoundedRectangle(cornerRadius: 4)
                             .strokeBorder(axisColor(second).opacity(0.8), lineWidth: 1)
                     )
-                    .frame(width: 24, height: 24)
+                    .frame(
+                        width: FFGumballHitTarget.planeVisual,
+                        height: FFGumballHitTarget.planeVisual
+                    )
+                    .frame(
+                        width: FFGumballHitTarget.minimum,
+                        height: FFGumballHitTarget.minimum
+                    )
                     .contentShape(Rectangle())
                     .position(x: point.x, y: point.y)
                     .gesture(planeDrag(first: first, second: second))
@@ -183,7 +201,7 @@ struct FFGumballOverlay: View {
                     numericZ = ""
                 }
                 .font(FFType.caption)
-                .frame(minHeight: 44)
+                .frame(minWidth: FFHitTarget.minimum, minHeight: FFHitTarget.minimum)
                 .foregroundStyle(FFPalette.textPrimary.color)
                 .accessibilityIdentifier("gumball.numeric.apply")
             }
@@ -239,7 +257,7 @@ struct FFGumballOverlay: View {
             .font(FFType.monoSmall)
             .foregroundStyle(FFPalette.textPrimary.color)
             .keyboardType(.numbersAndPunctuation)
-            .frame(width: 54, height: 34)
+            .frame(width: 54, height: FFHitTarget.minimum)
             .padding(.horizontal, 4)
             .background(FFPalette.raised.color, in: RoundedRectangle(cornerRadius: 6))
             .accessibilityIdentifier(identifier)
@@ -253,6 +271,8 @@ struct FFGumballOverlay: View {
                     draggingAxis = axis
                     dragKey = UUID().uuidString
                     session.beginDrag()
+                    snapHaptics.begin(transform: session.transform, step: session.snapStep)
+                    FFSnapHaptics.prepare()
                     onDragStateChange(true)
                 }
                 switch session.mode {
@@ -266,6 +286,7 @@ struct FFGumballOverlay: View {
                         snap: session.snapStep
                     ) {
                         session.move(by: delta)
+                        fireHapticIfSnapped()
                     }
                 case .rotate:
                     session.rotate(
@@ -284,6 +305,7 @@ struct FFGumballOverlay: View {
             .onEnded { _ in
                 session.commitDrag()
                 onCommitTransform(session.transform, dragKey)
+                snapHaptics.reset()
                 draggingAxis = nil
                 onDragStateChange(false)
             }
@@ -296,6 +318,8 @@ struct FFGumballOverlay: View {
                     draggingAxis = first
                     dragKey = UUID().uuidString
                     session.beginDrag()
+                    snapHaptics.begin(transform: session.transform, step: session.snapStep)
+                    FFSnapHaptics.prepare()
                     onDragStateChange(true)
                 }
                 guard session.mode == .move else { return }
@@ -308,14 +332,24 @@ struct FFGumballOverlay: View {
                     snap: session.snapStep
                 ) {
                     session.move(by: delta)
+                    fireHapticIfSnapped()
                 }
             }
             .onEnded { _ in
                 session.commitDrag()
                 onCommitTransform(session.transform, dragKey)
+                snapHaptics.reset()
                 draggingAxis = nil
                 onDragStateChange(false)
             }
+    }
+
+    private func fireHapticIfSnapped() {
+        guard snapHaptics.update(
+            transform: session.transform,
+            step: session.snapStep
+        ) else { return }
+        FFSnapHaptics.fire()
     }
 
     private func axisColor(_ axis: FFGumballAxis) -> Color {

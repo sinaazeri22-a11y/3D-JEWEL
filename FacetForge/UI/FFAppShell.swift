@@ -365,7 +365,7 @@ private struct FFAppBar: View {
             Image(systemName: systemImage)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(FFPalette.textSecondary.color)
-                .frame(width: 40, height: 44)
+                .frame(width: FFHitTarget.minimum, height: FFHitTarget.minimum)
                 .contentShape(Rectangle())
         }
         .buttonStyle(FFPressStyle())
@@ -1259,7 +1259,12 @@ private struct FFInspector: View {
                     }
 
                     ForEach(Array(layers.enumerated()), id: \.element.id) { index, layer in
-                        HStack(spacing: 2) {
+                        // The row and its icon controls are separate lines. The
+                        // three icons at Phase 24's 44 pt minimum would leave
+                        // no width for the row inside a 240 pt inspector, so
+                        // the row keeps the full width and the icons sit below
+                        // it. Every target stays 44×44 at every breakpoint.
+                        VStack(alignment: .leading, spacing: 0) {
                             Button {
                                 onSetCurrentLayer(layer.id)
                             } label: {
@@ -1295,7 +1300,11 @@ private struct FFInspector: View {
                                         .font(FFType.monoSmall)
                                         .foregroundStyle(FFPalette.textTertiary.color)
                                 }
-                                .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    minHeight: FFHitTarget.minimum,
+                                    alignment: .leading
+                                )
                                 // The row's blank middle is part of the target:
                                 // a finger aiming at the row, not at the name
                                 // glyph, must still make it current.
@@ -1308,35 +1317,40 @@ private struct FFInspector: View {
                                 layer.isLocked ? "Locked" : (layer.isVisible ? "Visible" : "Hidden")
                             )
 
-                            layerIconButton(
-                                layer.isVisible ? "eye" : "eye.slash",
-                                label: "\(layer.name) visibility",
-                                identifier: "layer.visible.\(index)",
-                                isSelected: !layer.isVisible
-                            ) {
-                                onToggleLayerVisibility(layer.id)
-                            }
+                            HStack(spacing: 2) {
+                                layerIconButton(
+                                    layer.isVisible ? "eye" : "eye.slash",
+                                    label: "\(layer.name) visibility",
+                                    identifier: "layer.visible.\(index)",
+                                    isSelected: !layer.isVisible
+                                ) {
+                                    onToggleLayerVisibility(layer.id)
+                                }
 
-                            layerIconButton(
-                                layer.isLocked ? "lock.fill" : "lock.open",
-                                label: "\(layer.name) lock",
-                                identifier: "layer.lock.\(index)",
-                                isSelected: layer.isLocked
-                            ) {
-                                onToggleLayerLock(layer.id)
-                            }
+                                layerIconButton(
+                                    layer.isLocked ? "lock.fill" : "lock.open",
+                                    label: "\(layer.name) lock",
+                                    identifier: "layer.lock.\(index)",
+                                    isSelected: layer.isLocked
+                                ) {
+                                    onToggleLayerLock(layer.id)
+                                }
 
-                            Button {
-                                onCycleLayerColor(layer.id)
-                            } label: {
-                                Circle()
-                                    .fill(swatch(layer.color))
-                                    .frame(width: 16, height: 16)
-                                    .frame(width: 30, height: 40)
+                                Button {
+                                    onCycleLayerColor(layer.id)
+                                } label: {
+                                    Circle()
+                                        .fill(swatch(layer.color))
+                                        .frame(width: 16, height: 16)
+                                        .frame(
+                                            width: FFHitTarget.minimum,
+                                            height: FFHitTarget.minimum
+                                        )
+                                }
+                                .buttonStyle(FFPressStyle())
+                                .accessibilityLabel("\(layer.name) colour")
+                                .accessibilityIdentifier("layer.color.\(index)")
                             }
-                            .buttonStyle(FFPressStyle())
-                            .accessibilityLabel("\(layer.name) colour")
-                            .accessibilityIdentifier("layer.color.\(index)")
                         }
                     }
 
@@ -1578,7 +1592,7 @@ private struct FFInspector: View {
                 .foregroundStyle(
                     isSelected ? FFPalette.accent.color : FFPalette.textSecondary.color
                 )
-                .frame(width: 30, height: 40)
+                .frame(width: FFHitTarget.minimum, height: FFHitTarget.minimum)
                 .background(
                     isSelected ? FFPalette.raised.color : Color.clear,
                     in: RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
