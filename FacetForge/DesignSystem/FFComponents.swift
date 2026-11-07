@@ -137,7 +137,7 @@ struct FFField: View {
                     // hit target the audit walks. SwiftUI reports a text
                     // field's accessibility frame from its text box, so the
                     // padding is what makes that frame a full 44 pt tall.
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 13)
                     .frame(minHeight: FFHitTarget.minimum)
                     .contentShape(Rectangle())
                     .accessibilityLabel(label)
@@ -150,7 +150,7 @@ struct FFField: View {
                 }
             }
             .padding(.horizontal, FFSpace.sm)
-            .frame(minHeight: 44)
+            .frame(minHeight: FFHitTarget.minimum)
             .background(FFPalette.field.color, in: RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
