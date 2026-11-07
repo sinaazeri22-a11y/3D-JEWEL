@@ -114,11 +114,13 @@ enum FFPThumbnail {
             }
             if let payload = node.geometry?.curve {
                 for segment in payload.segments {
-                    let points = segment.controlPoints.map { world.transformedPoint($0.vector) }
+                    let points = segment.controlPoints.map { point in
+                        world.transformedPoint(Vec3(x: point.x, y: point.y, z: 0))
+                    }
                     guard let first = points.first, points.count > 1 else { continue }
                     var line = points
                     if payload.isClosed { line.append(first) }
-                    let depth = line.map(\.z).reduce(0, +) / Double(line.count)
+                    let depth = line.reduce(0) { $0 + $1.z } / Double(line.count)
                     polylines.append(WorldPolyline(points: line, depth: depth))
                 }
             }
