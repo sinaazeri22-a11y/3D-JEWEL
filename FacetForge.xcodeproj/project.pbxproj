@@ -47,6 +47,11 @@
 		A1000000000000000000006A /* FFSnapshotHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000069 /* FFSnapshotHarness.swift */; };
 		A1000000000000000000006C /* FFTouchArbitration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000006B /* FFTouchArbitration.swift */; };
 		A1000000000000000000006E /* FFSnapHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000006D /* FFSnapHaptics.swift */; };
+		A10000000000000000000071 /* FFPJSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000072 /* FFPJSONValue.swift */; };
+		A10000000000000000000073 /* FFPGeometryCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000074 /* FFPGeometryCodec.swift */; };
+		A10000000000000000000075 /* FFPManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000076 /* FFPManifest.swift */; };
+		A10000000000000000000077 /* FFPDocumentBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000078 /* FFPDocumentBundle.swift */; };
+		A10000000000000000000079 /* FFPThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000007A /* FFPThumbnail.swift */; };
 		A2000000000000000000000B /* AppIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppIdentityTests.swift */; };
 		A2000000000000000000000F /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* DesignSystemTests.swift */; };
 		A20000000000000000000011 /* ComponentSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* ComponentSnapshotTests.swift */; };
@@ -71,6 +76,8 @@
 		A20000000000000000000037 /* Phase22SnapshotHarnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* Phase22SnapshotHarnessTests.swift */; };
 		A20000000000000000000039 /* Phase23EditIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* Phase23EditIntegrationTests.swift */; };
 		A2000000000000000000003B /* Phase24TouchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000003A /* Phase24TouchTests.swift */; };
+		A2000000000000000000003C /* FFPJSONSchemaValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000003D /* FFPJSONSchemaValidator.swift */; };
+		A2000000000000000000003E /* Phase25FileFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000003F /* Phase25FileFormatTests.swift */; };
 		A3000000000000000000001F /* LayerPanelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000001E /* LayerPanelUITests.swift */; };
 		A30000000000000000000021 /* PerformanceHUDUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000020 /* PerformanceHUDUITests.swift */; };
 		A30000000000000000000023 /* Phase23SmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000022 /* Phase23SmokeUITests.swift */; };
@@ -145,6 +152,11 @@
 		A10000000000000000000069 /* FFSnapshotHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFSnapshotHarness.swift; sourceTree = "<group>"; };
 		A1000000000000000000006B /* FFTouchArbitration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFTouchArbitration.swift; sourceTree = "<group>"; };
 		A1000000000000000000006D /* FFSnapHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFSnapHaptics.swift; sourceTree = "<group>"; };
+		A10000000000000000000072 /* FFPJSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPJSONValue.swift; sourceTree = "<group>"; };
+		A10000000000000000000074 /* FFPGeometryCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPGeometryCodec.swift; sourceTree = "<group>"; };
+		A10000000000000000000076 /* FFPManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPManifest.swift; sourceTree = "<group>"; };
+		A10000000000000000000078 /* FFPDocumentBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPDocumentBundle.swift; sourceTree = "<group>"; };
+		A1000000000000000000007A /* FFPThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPThumbnail.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* AppIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIdentityTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000000E /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000010 /* ComponentSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentSnapshotTests.swift; sourceTree = "<group>"; };
@@ -169,6 +181,8 @@
 		A20000000000000000000036 /* Phase22SnapshotHarnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase22SnapshotHarnessTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000038 /* Phase23EditIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase23EditIntegrationTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000003A /* Phase24TouchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase24TouchTests.swift; sourceTree = "<group>"; };
+		A2000000000000000000003D /* FFPJSONSchemaValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPJSONSchemaValidator.swift; sourceTree = "<group>"; };
+		A2000000000000000000003F /* Phase25FileFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase25FileFormatTests.swift; sourceTree = "<group>"; };
 		A3000000000000000000001E /* LayerPanelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerPanelUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000020 /* PerformanceHUDUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceHUDUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000022 /* Phase23SmokeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase23SmokeUITests.swift; sourceTree = "<group>"; };
@@ -242,6 +256,7 @@
 				A1000000000000000000002A /* Math */,
 				A1000000000000000000003C /* Units */,
 				A10000000000000000000044 /* Document */,
+				A10000000000000000000070 /* FileFormat */,
 				A10000000000000000000038 /* Render */,
 				A10000000000000000000063 /* Measure */,
 				A1000000000000000000000C /* Assets.xcassets */,
@@ -334,6 +349,18 @@
 			path = Document;
 			sourceTree = "<group>";
 		};
+		A10000000000000000000070 /* FileFormat */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000072 /* FFPJSONValue.swift */,
+				A10000000000000000000074 /* FFPGeometryCodec.swift */,
+				A10000000000000000000076 /* FFPManifest.swift */,
+				A10000000000000000000078 /* FFPDocumentBundle.swift */,
+				A1000000000000000000007A /* FFPThumbnail.swift */,
+			);
+			path = FileFormat;
+			sourceTree = "<group>";
+		};
 		A20000000000000000000001 /* FacetForgeTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -361,6 +388,8 @@
 				A20000000000000000000036 /* Phase22SnapshotHarnessTests.swift */,
 				A20000000000000000000038 /* Phase23EditIntegrationTests.swift */,
 				A2000000000000000000003A /* Phase24TouchTests.swift */,
+				A2000000000000000000003D /* FFPJSONSchemaValidator.swift */,
+				A2000000000000000000003F /* Phase25FileFormatTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -553,6 +582,11 @@
 				A1000000000000000000006A /* FFSnapshotHarness.swift in Sources */,
 				A1000000000000000000006C /* FFTouchArbitration.swift in Sources */,
 				A1000000000000000000006E /* FFSnapHaptics.swift in Sources */,
+				A10000000000000000000071 /* FFPJSONValue.swift in Sources */,
+				A10000000000000000000073 /* FFPGeometryCodec.swift in Sources */,
+				A10000000000000000000075 /* FFPManifest.swift in Sources */,
+				A10000000000000000000077 /* FFPDocumentBundle.swift in Sources */,
+				A10000000000000000000079 /* FFPThumbnail.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -584,6 +618,8 @@
 				A20000000000000000000037 /* Phase22SnapshotHarnessTests.swift in Sources */,
 				A20000000000000000000039 /* Phase23EditIntegrationTests.swift in Sources */,
 				A2000000000000000000003B /* Phase24TouchTests.swift in Sources */,
+				A2000000000000000000003C /* FFPJSONSchemaValidator.swift in Sources */,
+				A2000000000000000000003E /* Phase25FileFormatTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

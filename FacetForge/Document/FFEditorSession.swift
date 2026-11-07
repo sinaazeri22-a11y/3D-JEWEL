@@ -38,6 +38,9 @@ final class FFEditorSession: ObservableObject {
 
     private(set) var documentSession: FFDocumentSession
     private let store: FFDocumentStore
+    /// What the bundle reader did not understand. Kept across edits so a save
+    /// rewrites a future minor writer's fields alongside this version's.
+    private var preservation: FFPBundlePreservation?
 
     /// A new session. With no document argument the bench sample is loaded and
     /// its stone opens selected, which is the state Phase 17's CI asserts.
@@ -57,6 +60,7 @@ final class FFEditorSession: ObservableObject {
         self.measurements = initial.measurements.map(\.measurement)
         self.documentStatus = initial.name
         self.documentURL = documentURL
+        self.preservation = nil
         self.selection = document == nil
             ? FFSelectionState(selectedIDs: sample.selectedNodeIDs)
             : FFSelectionState()
@@ -253,6 +257,7 @@ final class FFEditorSession: ObservableObject {
         syncDocumentState()
         selection = FFSelectionState()
         documentURL = nil
+        preservation = nil
         documentStatus = "New document"
     }
 
@@ -264,6 +269,7 @@ final class FFEditorSession: ObservableObject {
         syncDocumentState()
         selection = FFSelectionState(selectedIDs: sample.selectedNodeIDs)
         documentURL = nil
+        preservation = nil
         documentStatus = "Fixture loaded"
     }
 
@@ -373,7 +379,12 @@ final class FFEditorSession: ObservableObject {
     /// saved goes to the app's Documents directory.
     func save(to url: URL? = nil) throws {
         let destination = url ?? documentURL ?? Self.defaultDocumentURL
-        try store.save(documentSession.document, to: destination)
+        try store.save(
+            documentSession.document,
+            to: destination,
+            preservation: preservation,
+            thumbnail: FFPThumbnail.png(for: documentSession.document)
+        )
         documentURL = destination
         documentStatus = "Saved \(destination.lastPathComponent)"
     }
@@ -386,10 +397,11 @@ final class FFEditorSession: ObservableObject {
     /// Loads a document from disk and replaces the scene, modes and selection.
     /// The undo history is reset: undo must never reach across a reopened file.
     func reopen(from url: URL) throws {
-        let loaded = try store.load(from: url)
-        documentSession = FFDocumentSession(document: loaded)
+        let loaded = try store.loadContent(from: url)
+        documentSession = FFDocumentSession(document: loaded.document)
         syncDocumentState()
         documentURL = url
+        preservation = loaded.preservation
         selection = FFSelectionState.initial(for: scene)
         documentStatus = "Reopened \(url.lastPathComponent)"
     }
@@ -397,7 +409,7 @@ final class FFEditorSession: ObservableObject {
     static var defaultDocumentURL: URL {
         let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return directory.appendingPathComponent("Untitled.facetforge.json")
+        return directory.appendingPathComponent("Untitled.ffp")
     }
 
     /// Flattens the document's node tree into the flat scene the renderer

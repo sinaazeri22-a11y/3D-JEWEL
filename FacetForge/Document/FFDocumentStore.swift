@@ -1,40 +1,43 @@
 import Foundation
 
-/// Atomic save/load for `FFDocument`.
+/// Save and load for `FFDocument` on top of the `.ffp` bundle.
 ///
-/// The file format is the canonical JSON produced by `FFDocument.encoded()`.
-/// Saving writes a sibling temporary file and then replaces the destination, so
-/// a crash or a full disk can never leave a half-written document behind. The
-/// temporary file is removed on every failure path.
+/// The bundle writer builds a complete sibling directory and swaps it in, so a
+/// crash or a full disk can never leave a half-written document behind. A
+/// document saved before Phase 25 is a single JSON file; the bundle reader
+/// detects that shape and decodes it, and the next save writes a bundle.
 struct FFDocumentStore {
     let fileManager: FileManager
+    private let bundle: FFPDocumentBundle
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
+        self.bundle = FFPDocumentBundle(fileManager: fileManager)
     }
 
-    func save(_ document: FFDocument, to url: URL) throws {
-        let data = try document.encoded()
-        let directory = url.deletingLastPathComponent()
-        let temporary = directory.appendingPathComponent(
-            ".\(url.lastPathComponent).\(UUID().uuidString).tmp"
+    func save(
+        _ document: FFDocument,
+        to url: URL,
+        preservation: FFPBundlePreservation? = nil,
+        thumbnail: Data? = nil
+    ) throws {
+        try bundle.write(
+            document: document,
+            to: url,
+            preservation: preservation,
+            thumbnail: thumbnail
         )
-
-        do {
-            try data.write(to: temporary, options: [])
-            if fileManager.fileExists(atPath: url.path) {
-                _ = try fileManager.replaceItemAt(url, withItemAt: temporary)
-            } else {
-                try fileManager.moveItem(at: temporary, to: url)
-            }
-        } catch {
-            try? fileManager.removeItem(at: temporary)
-            throw error
-        }
     }
 
     func load(from url: URL) throws -> FFDocument {
-        try FFDocument.decoded(from: Data(contentsOf: url))
+        try loadContent(from: url).document
+    }
+
+    /// Loads the document and the preservation token. Callers that keep the
+    /// token can rewrite the bundle without dropping fields or files the
+    /// reader did not understand.
+    func loadContent(from url: URL) throws -> FFPBundleContent {
+        try bundle.read(from: url)
     }
 }
 
