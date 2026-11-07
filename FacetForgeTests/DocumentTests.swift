@@ -159,13 +159,22 @@ final class DocumentTests: XCTestCase {
 
         try store.save(document, to: url)
         XCTAssertEqual(try store.load(from: url), document)
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), ["solitaire.fdoc"])
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted(),
+            ["solitaire.fdoc"],
+            "one save should leave exactly the bundle"
+        )
 
         var renamed = document
         renamed.name = "Solitaire v2"
         try store.save(renamed, to: url)
         XCTAssertEqual(try store.load(from: url).name, "Solitaire v2")
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), ["solitaire.fdoc"])
+        // Phase 26 keeps the previous bundle for recovery, so a second save
+        // leaves exactly one hidden sibling beside the primary. No temporary
+        // directory may survive either save.
+        let entries = try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
+        XCTAssertEqual(entries, [".solitaire.fdoc.previous", "solitaire.fdoc"])
+        XCTAssertFalse(entries.contains { $0.contains(".tmp") })
         document = renamed
         XCTAssertEqual(try store.load(from: url).stateHash, document.stateHash)
     }
