@@ -13,7 +13,7 @@ enum FFDisplayPacing {
         guard let maximum = maximumFramesPerSecond,
               maximum >= minimumFramesPerSecond
         else { return minimumFramesPerSecond }
-        return min(maximum, maximumFramesPerSecond)
+        return min(maximum, Self.maximumFramesPerSecond)
     }
 }
 
