@@ -131,26 +131,31 @@ struct ComponentGalleryView: View {
             .background(FFPalette.canvas.color)
             .navigationTitle("Component gallery")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .foregroundStyle(FFPalette.textAccent.color)
-                }
-            }
         }
         .preferredColorScheme(.dark)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: FFSpace.xs) {
-            Text("Component gallery")
-                .font(FFType.display)
-                .foregroundStyle(FFPalette.textPrimary.color)
-                .accessibilityIdentifier("gallery.title")
+        HStack(alignment: .top, spacing: FFSpace.sm) {
+            VStack(alignment: .leading, spacing: FFSpace.xs) {
+                Text("Component gallery")
+                    .font(FFType.display)
+                    .foregroundStyle(FFPalette.textPrimary.color)
+                    .accessibilityIdentifier("gallery.title")
 
-            Text("\(FFComponentCatalog.names.count) primitives · dark-first · AA text contrast")
-                .font(FFType.caption)
-                .foregroundStyle(FFPalette.textSecondary.color)
+                Text("\(FFComponentCatalog.names.count) primitives · dark-first · AA text contrast")
+                    .font(FFType.caption)
+                    .foregroundStyle(FFPalette.textSecondary.color)
+            }
+
+            Spacer(minLength: 0)
+
+            // A navigation-bar Done button reports a 36 pt tall accessibility
+            // frame on iOS, below Phase 24's 44 pt minimum. The dismissal
+            // lives in the header instead, where the design system owns the
+            // size: FFButton is at least 44×44 by construction.
+            FFButton(title: "Done", kind: .secondary) { dismiss() }
+                .accessibilityIdentifier("gallery.done")
         }
     }
 

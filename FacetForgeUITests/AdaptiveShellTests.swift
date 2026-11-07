@@ -32,7 +32,24 @@ final class AdaptiveShellTests: XCTestCase {
 
             let window = app.windows.firstMatch
             XCTAssertTrue(window.exists, "app window missing at \(Int(width)) pt")
-            XCTAssertEqual(shell.frame.width, width, accuracy: 3, "shell did not render at \(Int(width)) pt")
+            // The zone frames belong in the message: the shell is an
+            // accessibility container, so its reported width is the union of
+            // its children and a failure has to name which zone overflowed.
+            XCTAssertEqual(
+                shell.frame.width,
+                width,
+                accuracy: 3,
+                """
+                shell did not render at \(Int(width)) pt
+                window=\(window.frame)
+                shell=\(shell.frame)
+                tools=\(tools.frame)
+                viewport=\(viewport.frame)
+                inspector=\(inspector.frame)
+                hierarchy:
+                \(app.debugDescription)
+                """
+            )
             XCTAssertGreaterThanOrEqual(shell.frame.minX, window.frame.minX - 1, "shell is clipped at the left edge")
             XCTAssertLessThanOrEqual(shell.frame.maxX, window.frame.maxX + 1, "shell is wider than the app window")
             XCTAssertGreaterThan(tools.frame.width, 0)

@@ -14,7 +14,10 @@ enum SnapshotBaseline {
         "button": "6c8b25966b097ea61660e2f13ebc0f783f2a9778afdf3b3ccf9474f941ee356b",
         "chip": "f4cdbbc995e5c90b56671ba9c0e1bd395176ee5e38ea733f75be965bd91c3c93",
         "empty-state": "de0a9fa4c068f2d61cbcc948bfc7330782793f23c328bdb8f62b44872d2bfb16",
-        "field": "ed57009f06272a9fcc3f979eed3b1f835a1b85a04f654e1bef35181499354b71",
+        // Phase 24 pads the text box to a 44 pt target, which moves the
+        // glyphs by a subpixel inside the capsule. Re-recorded from the arm64
+        // gate run 42402521613.
+        "field": "2073620f6772cdd61a9f07b87a58b6866a5075249e3b3ce7e348aacd84fd5c43",
         "list-row": "bf41d3027b5de69138b6e98466a7cf086143f7784e650d05df4c83903a37fc81",
         "panel": "257075d5e08ee458c3bd27c71629c302f043cc60afb10b6a67cbf79a04a0fdd9",
         "segmented": "28026aa57b65f2201a2e5500baa0629bfb268a07ab09dd876d35acb118f05176",
@@ -27,6 +30,9 @@ enum SnapshotBaseline {
 
     // Recorded by the macos-26-intel gate on 2026-11-06 (run 42257558856).
     // Every value is a digest of the same committed fixture, not a new render.
+    // "field" predates Phase 24's 44 pt text box: no Intel gate has rendered
+    // that change, so an Intel fallback run must re-record it before claiming
+    // a green.
     static let x86_64Hashes: [String: String] = [
         "button": "a0c17c6dfc5c7b68a0d4e64e8dd7e88cadcbac7774bd8404b1c80bf010ffdf78",
         "chip": "1d7a26f25fe6eb9c310c4c9275bea081f785a6b12a06d84e9c90c9d99658cbba",
