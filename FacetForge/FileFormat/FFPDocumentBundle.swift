@@ -64,6 +64,18 @@ struct FFPDocumentBundle {
             }
 
             try copyUnknownEntries(from: url, to: temporary)
+            for (relativePath, data) in preservation?.files ?? [:] {
+                try FFPManifest.validateRelativePath(relativePath)
+                let target = temporary.appendingPathComponent(relativePath)
+                try fileManager.createDirectory(
+                    at: target.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                if fileManager.fileExists(atPath: target.path) {
+                    try fileManager.removeItem(at: target)
+                }
+                try data.write(to: target)
+            }
             try writeChecksums(in: temporary)
             try swap(temporary, into: url)
         } catch {
@@ -164,9 +176,17 @@ struct FFPDocumentBundle {
         }
 
         let thumbnailURL = url.appendingPathComponent(FFPFormat.thumbnailName)
+        var preservation = decoded.preservation
+        var preservedFiles: [String: Data] = [:]
+        for (relativePath, fileURL) in try files(in: url) {
+            let first = relativePath.split(separator: "/").first.map(String.init) ?? relativePath
+            guard !FFPFormat.ownedNames.contains(first) else { continue }
+            preservedFiles[relativePath] = try Data(contentsOf: fileURL)
+        }
+        preservation?.files = preservedFiles
         return FFPBundleContent(
             document: decoded.document,
-            preservation: decoded.preservation,
+            preservation: preservation,
             legacySingleFile: false,
             thumbnail: fileManager.fileExists(atPath: thumbnailURL.path)
                 ? try Data(contentsOf: thumbnailURL)

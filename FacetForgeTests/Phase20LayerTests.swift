@@ -119,7 +119,10 @@ final class Phase20LayerTests: XCTestCase {
         let expectedCurrent = session.currentLayerID
         try session.save(to: url)
 
-        let saved = try FFDocument.decoded(from: Data(contentsOf: url))
+        // The save path is a Phase 25 `.ffp` bundle, so the file is read
+        // through its store rather than as standalone JSON. The assertions
+        // below still prove that every layer field reached the save file.
+        let saved = try FFDocumentStore().load(from: url)
         XCTAssertEqual(saved.layers, expectedLayers, "layers did not reach the save file")
         XCTAssertEqual(saved.currentLayerID, expectedCurrent)
         XCTAssertEqual(saved.node(withID: shankID)?.layerID, metal.id)

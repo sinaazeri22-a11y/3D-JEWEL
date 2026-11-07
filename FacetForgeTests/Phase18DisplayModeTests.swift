@@ -178,7 +178,10 @@ final class Phase18DisplayModeTests: XCTestCase {
         XCTAssertTrue(session.documentSession.canUndo, "the mode did not go through the document session")
         try session.save(to: url)
 
-        let saved = try FFDocument.decoded(from: Data(contentsOf: url))
+        // The save path is a Phase 25 `.ffp` bundle, so the file is read
+        // through its store rather than as standalone JSON. The assertion is
+        // unchanged: the mode reached the saved document.
+        let saved = try FFDocumentStore().load(from: url)
         XCTAssertEqual(saved.displayModes["perspective"], .technical)
         XCTAssertEqual(saved.displayModes["top"], .wireframe)
 

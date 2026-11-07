@@ -18,6 +18,10 @@ enum FFPFormatError: Error, Equatable {
 struct FFPBundlePreservation: Equatable, Sendable {
     var manifest: FFPJSONValue
     var document: FFPJSONValue
+    /// Unknown bundle files, keyed by relative path. Carrying the bytes in the
+    /// token is what lets a save to a new destination keep them; the writer
+    /// also consults the destination for files it does not own.
+    var files: [String: Data] = [:]
 }
 
 /// The `.ffp` v1 bundle constants and the manifest codec.
