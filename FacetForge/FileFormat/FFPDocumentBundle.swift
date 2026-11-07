@@ -183,7 +183,7 @@ struct FFPDocumentBundle {
             guard !FFPFormat.ownedNames.contains(first) else { continue }
             preservedFiles[relativePath] = try Data(contentsOf: fileURL)
         }
-        preservation?.files = preservedFiles
+        preservation.files = preservedFiles
         return FFPBundleContent(
             document: decoded.document,
             preservation: preservation,
