@@ -1210,6 +1210,37 @@ private struct FFInspector: View {
         layers.first { $0.id == currentLayerID }
     }
 
+    /// The three layer commands, shared by both `ViewThatFits` layouts so the
+    /// identifiers and enabled rules cannot drift between breakpoints.
+    @ViewBuilder
+    private var layerCommandChips: some View {
+        FFChip(
+            title: "Add",
+            systemImage: "plus",
+            accessibilityIdentifier: "layer.add"
+        ) {
+            onAddLayer()
+        }
+
+        FFChip(
+            title: "Select",
+            systemImage: "square.dashed",
+            accessibilityIdentifier: "layer.select"
+        ) {
+            if let currentLayerID { onSelectLayer(currentLayerID) }
+        }
+        .disabled(currentLayer == nil || currentLayer?.isVisible == false)
+
+        FFChip(
+            title: "Move",
+            systemImage: "arrow.right.to.line",
+            accessibilityIdentifier: "layer.assign"
+        ) {
+            if let currentLayerID { onAssignToLayer(currentLayerID) }
+        }
+        .disabled(selection.selectedIDs.isEmpty || currentLayer?.isLocked == true)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: FFSpace.sm) {
@@ -1239,32 +1270,20 @@ private struct FFInspector: View {
                     subtitle: "\(layers.count) layers",
                     trailing: currentLayer.map { "Current: \($0.name)" }
                 ) {
-                    HStack(spacing: FFSpace.xxs) {
-                        FFChip(
-                            title: "Add",
-                            systemImage: "plus",
-                            accessibilityIdentifier: "layer.add"
-                        ) {
-                            onAddLayer()
+                    // Phase 24's 44 pt target plus chip padding makes each
+                    // command 68 pt wide, so the row needs 212 pt. The compact
+                    // inspector's content box is narrower than that: keep the
+                    // single row where it fits and stack the same three
+                    // commands where it does not, instead of letting the
+                    // column spill into the viewport.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: FFSpace.xxs) {
+                            layerCommandChips
                         }
 
-                        FFChip(
-                            title: "Select",
-                            systemImage: "square.dashed",
-                            accessibilityIdentifier: "layer.select"
-                        ) {
-                            if let currentLayerID { onSelectLayer(currentLayerID) }
+                        VStack(alignment: .leading, spacing: FFSpace.xxs) {
+                            layerCommandChips
                         }
-                        .disabled(currentLayer == nil || currentLayer?.isVisible == false)
-
-                        FFChip(
-                            title: "Move",
-                            systemImage: "arrow.right.to.line",
-                            accessibilityIdentifier: "layer.assign"
-                        ) {
-                            if let currentLayerID { onAssignToLayer(currentLayerID) }
-                        }
-                        .disabled(selection.selectedIDs.isEmpty || currentLayer?.isLocked == true)
                     }
 
                     ForEach(Array(layers.enumerated()), id: \.element.id) { index, layer in
