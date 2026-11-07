@@ -78,6 +78,7 @@
 		A2000000000000000000003B /* Phase24TouchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000003A /* Phase24TouchTests.swift */; };
 		A2000000000000000000003C /* FFPJSONSchemaValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000003D /* FFPJSONSchemaValidator.swift */; };
 		A2000000000000000000003E /* Phase25FileFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000003F /* Phase25FileFormatTests.swift */; };
+		A20000000000000000000040 /* Phase26ReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000041 /* Phase26ReliabilityTests.swift */; };
 		A3000000000000000000001F /* LayerPanelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000001E /* LayerPanelUITests.swift */; };
 		A30000000000000000000021 /* PerformanceHUDUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000020 /* PerformanceHUDUITests.swift */; };
 		A30000000000000000000023 /* Phase23SmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000022 /* Phase23SmokeUITests.swift */; };
@@ -183,6 +184,7 @@
 		A2000000000000000000003A /* Phase24TouchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase24TouchTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000003D /* FFPJSONSchemaValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPJSONSchemaValidator.swift; sourceTree = "<group>"; };
 		A2000000000000000000003F /* Phase25FileFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase25FileFormatTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000041 /* Phase26ReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase26ReliabilityTests.swift; sourceTree = "<group>"; };
 		A3000000000000000000001E /* LayerPanelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerPanelUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000020 /* PerformanceHUDUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceHUDUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000022 /* Phase23SmokeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase23SmokeUITests.swift; sourceTree = "<group>"; };
@@ -390,6 +392,7 @@
 				A2000000000000000000003A /* Phase24TouchTests.swift */,
 				A2000000000000000000003D /* FFPJSONSchemaValidator.swift */,
 				A2000000000000000000003F /* Phase25FileFormatTests.swift */,
+				A20000000000000000000041 /* Phase26ReliabilityTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -620,6 +623,7 @@
 				A2000000000000000000003B /* Phase24TouchTests.swift in Sources */,
 				A2000000000000000000003C /* FFPJSONSchemaValidator.swift in Sources */,
 				A2000000000000000000003E /* Phase25FileFormatTests.swift in Sources */,
+				A20000000000000000000040 /* Phase26ReliabilityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

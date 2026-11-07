@@ -12,6 +12,53 @@ enum FFPFormatError: Error, Equatable {
     case unsafePath(String)
 }
 
+extension FFPFormatError {
+    /// A newer format is never masked by an older saved copy, and an unsafe
+    /// path is a security failure rather than damage. Every other case means
+    /// bytes on disk are wrong, which is what the last-good save is for.
+    var allowsLastGoodRecovery: Bool {
+        switch self {
+        case .unsupportedFormatVersion, .unsafePath:
+            return false
+        case .malformedManifest, .corruptGeometry, .missingEntry, .checksumMismatch:
+            return true
+        }
+    }
+
+    var damagedEntry: String? {
+        switch self {
+        case .missingEntry(let path), .checksumMismatch(let path):
+            return path
+        case .malformedManifest, .corruptGeometry, .unsupportedFormatVersion, .unsafePath:
+            return nil
+        }
+    }
+
+    var recoveryDescription: String {
+        switch self {
+        case .unsupportedFormatVersion(let version):
+            return "format version \(version) is newer than this app"
+        case .malformedManifest(let detail):
+            return "manifest is malformed (\(detail))"
+        case .corruptGeometry(let detail):
+            return "geometry is corrupt (\(detail))"
+        case .missingEntry(let path):
+            return "\(path) is missing"
+        case .checksumMismatch(let path):
+            return "checksum mismatch for \(path)"
+        case .unsafePath(let path):
+            return "unsafe path \(path)"
+        }
+    }
+}
+
+/// What happened when a damaged bundle was replaced by its last good save in
+/// memory. The damaged bundle is never deleted or rewritten by a read.
+struct FFPRecoveryNotice: Equatable, Sendable {
+    var message: String
+    var damagedEntry: String?
+}
+
 /// Everything a reader needs to rewrite a bundle without dropping what it did
 /// not understand. The writer only preserves fields and files; typed values
 /// always win, so an edit is never shadowed by a stale preserved copy.

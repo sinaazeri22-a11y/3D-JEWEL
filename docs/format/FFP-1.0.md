@@ -165,5 +165,27 @@ checksums and swaps the directory in. Readers never mutate the bundle.
 
 Errors are typed (`FFPFormatError`) so callers can distinguish an unsupported
 future version, a malformed manifest, corrupt geometry, a missing entry, a
-checksum mismatch and an unsafe path. Phase 26 adds the interrupted-write
-recovery journal on top of this format; the format itself does not depend on it.
+checksum mismatch and an unsafe path.
+
+## 8. Last-good save and recovery
+
+Before a new bundle replaces an existing one, the writer copies the existing
+bundle to a hidden sibling `.<name>.previous`. The copy happens only after the
+new bundle is complete in its temporary directory, and a copy failure aborts
+the save before the primary is touched. The previous slot is a normal bundle
+and can be opened with the same reader.
+
+When the primary fails an integrity check — a checksum mismatch, a missing
+entry, malformed JSON or corrupt geometry — the store reads the previous
+bundle instead and returns an `FFPRecoveryNotice` naming the damaged entry,
+for example:
+
+> Recovered the last good save of ring.ffp because the current bundle is
+damaged: checksum mismatch for geometry/geometry-000.bin. The damaged bundle
+was left in place.
+
+Two failures never fall back: an unsupported `formatVersion`, because hiding a
+newer bundle behind an older copy would silently discard the user's data, and
+an unsafe path, because that is a security failure rather than damage. A read
+never deletes, rewrites or repairs the damaged primary. If no previous bundle
+exists, the original integrity error is thrown.

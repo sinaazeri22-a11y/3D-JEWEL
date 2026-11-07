@@ -36,8 +36,26 @@ struct FFDocumentStore {
     /// Loads the document and the preservation token. Callers that keep the
     /// token can rewrite the bundle without dropping fields or files the
     /// reader did not understand.
+    ///
+    /// When the primary bundle fails an integrity check, the hidden previous
+    /// bundle answers instead and the content carries a notice naming the
+    /// damaged entry. A newer format version never falls back, and a damaged
+    /// primary is never deleted or rewritten by a read.
     func loadContent(from url: URL) throws -> FFPBundleContent {
-        try bundle.read(from: url)
+        do {
+            return try bundle.read(from: url)
+        } catch let error as FFPFormatError where error.allowsLastGoodRecovery {
+            let previous = FFPDocumentBundle.previousURL(for: url)
+            guard let recovered = try? bundle.read(from: previous) else {
+                throw error
+            }
+            var content = recovered
+            content.recovery = FFPRecoveryNotice(
+                message: "Recovered the last good save of \(url.lastPathComponent) because the current bundle is damaged: \(error.recoveryDescription). The damaged bundle was left in place.",
+                damagedEntry: error.damagedEntry
+            )
+            return content
+        }
     }
 }
 

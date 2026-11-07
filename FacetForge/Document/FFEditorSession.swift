@@ -32,6 +32,8 @@ final class FFEditorSession: ObservableObject {
     /// The last document command, shown in the app bar so a smoke run can read
     /// back that save and reopen actually happened.
     @Published private(set) var documentStatus: String
+    /// The reason a reopen used the last good save. `nil` on a normal open.
+    @Published private(set) var recoveryMessage: String?
     /// Where the document was last saved or loaded from. `nil` for a new bench
     /// sample that has never touched disk.
     @Published private(set) var documentURL: URL?
@@ -59,6 +61,7 @@ final class FFEditorSession: ObservableObject {
         self.currentLayerID = initial.currentLayerID
         self.measurements = initial.measurements.map(\.measurement)
         self.documentStatus = initial.name
+        self.recoveryMessage = nil
         self.documentURL = documentURL
         self.preservation = nil
         self.selection = document == nil
@@ -258,6 +261,7 @@ final class FFEditorSession: ObservableObject {
         selection = FFSelectionState()
         documentURL = nil
         preservation = nil
+        recoveryMessage = nil
         documentStatus = "New document"
     }
 
@@ -270,6 +274,7 @@ final class FFEditorSession: ObservableObject {
         selection = FFSelectionState(selectedIDs: sample.selectedNodeIDs)
         documentURL = nil
         preservation = nil
+        recoveryMessage = nil
         documentStatus = "Fixture loaded"
     }
 
@@ -402,8 +407,11 @@ final class FFEditorSession: ObservableObject {
         syncDocumentState()
         documentURL = url
         preservation = loaded.preservation
+        recoveryMessage = loaded.recovery?.message
         selection = FFSelectionState.initial(for: scene)
-        documentStatus = "Reopened \(url.lastPathComponent)"
+        documentStatus = loaded.recovery == nil
+            ? "Reopened \(url.lastPathComponent)"
+            : "Recovered last good save · \(url.lastPathComponent)"
     }
 
     static var defaultDocumentURL: URL {

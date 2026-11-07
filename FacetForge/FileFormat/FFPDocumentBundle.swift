@@ -8,6 +8,9 @@ struct FFPBundleContent {
     var preservation: FFPBundlePreservation?
     var legacySingleFile: Bool
     var thumbnail: Data?
+    /// Set when the primary bundle failed integrity checks and the last good
+    /// save answered instead. `nil` for a normal open.
+    var recovery: FFPRecoveryNotice? = nil
 }
 
 /// Reads and writes the `.ffp` document bundle.
@@ -16,13 +19,23 @@ struct FFPBundleContent {
 /// replaced without rewriting the model, and unknown files from a future
 /// minor writer can be copied through untouched. The writer builds a complete
 /// sibling directory and swaps it in, so the destination is never a
-/// half-written bundle; Phase 26 adds the recovery path for a swap interrupted
-/// by the OS.
+/// half-written bundle. Before the swap the previous bundle is copied to a
+/// hidden sibling, which the store can fall back to when the primary fails its
+/// checksums or a block is truncated.
 struct FFPDocumentBundle {
     let fileManager: FileManager
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
+    }
+
+    /// The sibling that keeps the last bundle that was known to be complete.
+    /// It is a bundle in its own right, readable with the same reader.
+    static func previousURL(for url: URL) -> URL {
+        url.deletingLastPathComponent().appendingPathComponent(
+            ".\(url.lastPathComponent).previous",
+            isDirectory: true
+        )
     }
 
     // MARK: - Write
@@ -64,6 +77,7 @@ struct FFPDocumentBundle {
             }
 
             try copyUnknownEntries(from: url, to: temporary)
+            try preservePrevious(at: url)
             for (relativePath, data) in preservation?.files ?? [:] {
                 try FFPManifest.validateRelativePath(relativePath)
                 let target = temporary.appendingPathComponent(relativePath)
@@ -126,6 +140,18 @@ struct FFPDocumentBundle {
             .write(to: bundle.appendingPathComponent(FFPFormat.checksumsName))
     }
 
+    /// Copies the destination to the hidden previous slot only when it is a
+    /// bundle. A legacy single file has no reusable previous, and a copy
+    /// failure aborts the save before the primary is touched.
+    private func preservePrevious(at destination: URL) throws {
+        guard isDirectory(destination) else { return }
+        let previous = Self.previousURL(for: destination)
+        if fileManager.fileExists(atPath: previous.path) {
+            try fileManager.removeItem(at: previous)
+        }
+        try fileManager.copyItem(at: destination, to: previous)
+    }
+
     private func swap(_ temporary: URL, into destination: URL) throws {
         if fileManager.fileExists(atPath: destination.path) {
             do {
@@ -165,7 +191,12 @@ struct FFPDocumentBundle {
         guard fileManager.fileExists(atPath: manifestURL.path) else {
             throw FFPFormatError.missingEntry(FFPFormat.manifestName)
         }
-        let manifest = try FFPJSONValue.parse(Data(contentsOf: manifestURL))
+        let manifest: FFPJSONValue
+        do {
+            manifest = try FFPJSONValue.parse(Data(contentsOf: manifestURL))
+        } catch {
+            throw FFPFormatError.malformedManifest("manifest.json is not valid JSON")
+        }
         let decoded = try FFPManifest.read(manifest: manifest) { relativePath in
             try FFPManifest.validateRelativePath(relativePath)
             let fileURL = url.appendingPathComponent(relativePath)
@@ -195,7 +226,12 @@ struct FFPDocumentBundle {
     }
 
     private func verifyChecksums(_ data: Data, in bundle: URL) throws {
-        let tree = try FFPJSONValue.parse(data)
+        let tree: FFPJSONValue
+        do {
+            tree = try FFPJSONValue.parse(data)
+        } catch {
+            throw FFPFormatError.malformedManifest("checksums.json is not valid JSON")
+        }
         guard let values = tree.objectValue,
               values["algorithm"]?.stringValue == "sha256",
               let files = values["files"]?.arrayValue else {
