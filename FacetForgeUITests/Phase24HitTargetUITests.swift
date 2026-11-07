@@ -7,6 +7,12 @@ final class Phase24HitTargetUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
+        // The hierarchy audit walks ten element queries at each of seven
+        // stages and every query is an accessibility snapshot, so a completed
+        // audit costs 4-5 minutes on a loaded runner. The workflow's 240 s
+        // default flagged a finished audit as a hang in run 42406979558; the
+        // checks are unchanged and only this class's ceiling moves.
+        executionTimeAllowance = 480
     }
 
     override func tearDownWithError() throws {
