@@ -433,14 +433,20 @@ private struct FFAppBar: View {
             .accessibilityIdentifier("shell.openGallery")
             .accessibilityLabel("Open component gallery")
 
-            Button(action: {}) {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(FFPalette.textSecondary.color)
-                    .frame(width: 44, height: 44)
+            // The export stub is the one app-bar control that can be dropped
+            // at the 640 pt minimum, where five 44 pt document buttons, the
+            // gallery and the title already fill the bar.
+            if !isCompact {
+                Button(action: {}) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(FFPalette.textSecondary.color)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(FFPressStyle())
+                .accessibilityLabel("Export")
             }
-            .buttonStyle(FFPressStyle())
-            .accessibilityLabel("Export")
         }
         .padding(.horizontal, FFSpace.sm)
         .frame(minHeight: 56)
@@ -478,6 +484,7 @@ private struct FFToolRail: View {
                             selectedTool == tool.id ? FFPalette.accent.color : Color.clear,
                             in: RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
                         )
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(FFPressStyle())
                 .accessibilityIdentifier("shell.tool.\(tool.id)")
@@ -492,6 +499,7 @@ private struct FFToolRail: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(FFPalette.textTertiary.color)
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(FFPressStyle())
             .accessibilityLabel("Hide tools")
@@ -1217,6 +1225,7 @@ private struct FFInspector: View {
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(FFPalette.textTertiary.color)
                             .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(FFPressStyle())
                     .accessibilityLabel("Hide inspector")
@@ -1346,6 +1355,7 @@ private struct FFInspector: View {
                                             width: FFHitTarget.minimum,
                                             height: FFHitTarget.minimum
                                         )
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(FFPressStyle())
                                 .accessibilityLabel("\(layer.name) colour")
@@ -1597,6 +1607,7 @@ private struct FFInspector: View {
                     isSelected ? FFPalette.raised.color : Color.clear,
                     in: RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
                 )
+                .contentShape(Rectangle())
         }
         .buttonStyle(FFPressStyle())
         .accessibilityLabel(label)

@@ -202,6 +202,7 @@ struct FFGumballOverlay: View {
                 }
                 .font(FFType.caption)
                 .frame(minWidth: FFHitTarget.minimum, minHeight: FFHitTarget.minimum)
+                .contentShape(Rectangle())
                 .foregroundStyle(FFPalette.textPrimary.color)
                 .accessibilityIdentifier("gumball.numeric.apply")
             }

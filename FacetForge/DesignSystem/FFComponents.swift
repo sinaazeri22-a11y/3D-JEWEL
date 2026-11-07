@@ -134,8 +134,12 @@ struct FFField: View {
                     .keyboardType(.decimalPad)
                     .textFieldStyle(.plain)
                     // The field, not only its surrounding capsule, is the
-                    // hit target the audit walks.
+                    // hit target the audit walks. SwiftUI reports a text
+                    // field's accessibility frame from its text box, so the
+                    // padding is what makes that frame a full 44 pt tall.
+                    .padding(.vertical, 12)
                     .frame(minHeight: FFHitTarget.minimum)
+                    .contentShape(Rectangle())
                     .accessibilityLabel(label)
 
                 if let unit {
