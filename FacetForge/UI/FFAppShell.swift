@@ -1409,10 +1409,14 @@ private struct FFInspector: View {
 
                     ForEach(Array(layers.enumerated()), id: \.element.id) { index, layer in
                         // The row and its icon controls are separate lines. The
-                        // three icons at Phase 24's 44 pt minimum would leave
-                        // no width for the row inside a 240 pt inspector, so
-                        // the row keeps the full width and the icons sit below
-                        // it. Every target stays 44×44 at every breakpoint.
+                        // icons at Phase 24's 44 pt minimum would leave no width
+                        // for the row inside a 240 pt inspector, so the row
+                        // keeps the full width and the icons sit below it.
+                        // Phase 31 adds a fourth state control: the four 44 pt
+                        // targets need 182 pt, more than the compact panel's
+                        // 152 pt content box, so they keep one line where they
+                        // fit and fall back to a 2×2 block where they do not.
+                        // Every target stays 44×44 at every breakpoint.
                         VStack(alignment: .leading, spacing: 0) {
                             Button {
                                 onSetCurrentLayer(layer.id)
@@ -1466,50 +1470,21 @@ private struct FFInspector: View {
                                 layer.isLocked ? "Locked" : (layer.isVisible ? "Visible" : "Hidden")
                             )
 
-                            HStack(spacing: 2) {
-                                layerIconButton(
-                                    layer.isVisible ? "eye" : "eye.slash",
-                                    label: "\(layer.name) visibility",
-                                    identifier: "layer.visible.\(index)",
-                                    isSelected: !layer.isVisible
-                                ) {
-                                    onToggleLayerVisibility(layer.id)
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 2) {
+                                    layerStateControls(layer: layer, index: index)
                                 }
 
-                                layerIconButton(
-                                    layer.isLocked ? "lock.fill" : "lock.open",
-                                    label: "\(layer.name) lock",
-                                    identifier: "layer.lock.\(index)",
-                                    isSelected: layer.isLocked
-                                ) {
-                                    onToggleLayerLock(layer.id)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 2) {
+                                        layerVisibilityButton(layer: layer, index: index)
+                                        layerLockButton(layer: layer, index: index)
+                                    }
+                                    HStack(spacing: 2) {
+                                        layerPrintButton(layer: layer, index: index)
+                                        layerColorButton(layer: layer, index: index)
+                                    }
                                 }
-
-                                layerIconButton(
-                                    layer.isPrintable ? "printer.fill" : "printer",
-                                    label: "\(layer.name) print",
-                                    identifier: "layer.print.\(index)",
-                                    isSelected: layer.isPrintable,
-                                    value: layer.isPrintable ? "Prints" : "Does not print"
-                                ) {
-                                    onToggleLayerPrint(layer.id)
-                                }
-
-                                Button {
-                                    onCycleLayerColor(layer.id)
-                                } label: {
-                                    Circle()
-                                        .fill(swatch(layer.color))
-                                        .frame(width: 16, height: 16)
-                                        .frame(
-                                            width: FFHitTarget.minimum,
-                                            height: FFHitTarget.minimum
-                                        )
-                                        .contentShape(Rectangle())
-                                }
-                                .buttonStyle(FFPressStyle())
-                                .accessibilityLabel("\(layer.name) colour")
-                                .accessibilityIdentifier("layer.color.\(index)")
                             }
                         }
                     }
@@ -1740,6 +1715,69 @@ private struct FFInspector: View {
                 .fill(FFPalette.separator.color)
                 .frame(width: 1)
         }
+    }
+
+    /// The four layer-state controls. Both `ViewThatFits` layouts compose the
+    /// same helpers, so identifiers, labels and session routes cannot drift
+    /// between the one-line and two-row arrangements.
+    @ViewBuilder
+    private func layerStateControls(layer: FFLayer, index: Int) -> some View {
+        layerVisibilityButton(layer: layer, index: index)
+        layerLockButton(layer: layer, index: index)
+        layerPrintButton(layer: layer, index: index)
+        layerColorButton(layer: layer, index: index)
+    }
+
+    private func layerVisibilityButton(layer: FFLayer, index: Int) -> some View {
+        layerIconButton(
+            layer.isVisible ? "eye" : "eye.slash",
+            label: "\(layer.name) visibility",
+            identifier: "layer.visible.\(index)",
+            isSelected: !layer.isVisible
+        ) {
+            onToggleLayerVisibility(layer.id)
+        }
+    }
+
+    private func layerLockButton(layer: FFLayer, index: Int) -> some View {
+        layerIconButton(
+            layer.isLocked ? "lock.fill" : "lock.open",
+            label: "\(layer.name) lock",
+            identifier: "layer.lock.\(index)",
+            isSelected: layer.isLocked
+        ) {
+            onToggleLayerLock(layer.id)
+        }
+    }
+
+    private func layerPrintButton(layer: FFLayer, index: Int) -> some View {
+        layerIconButton(
+            layer.isPrintable ? "printer.fill" : "printer",
+            label: "\(layer.name) print",
+            identifier: "layer.print.\(index)",
+            isSelected: layer.isPrintable,
+            value: layer.isPrintable ? "Prints" : "Does not print"
+        ) {
+            onToggleLayerPrint(layer.id)
+        }
+    }
+
+    private func layerColorButton(layer: FFLayer, index: Int) -> some View {
+        Button {
+            onCycleLayerColor(layer.id)
+        } label: {
+            Circle()
+                .fill(swatch(layer.color))
+                .frame(width: 16, height: 16)
+                .frame(
+                    width: FFHitTarget.minimum,
+                    height: FFHitTarget.minimum
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(FFPressStyle())
+        .accessibilityLabel("\(layer.name) colour")
+        .accessibilityIdentifier("layer.color.\(index)")
     }
 
     private func layerIconButton(
