@@ -10,6 +10,63 @@ enum FFLaunchFixtures {
         ProcessInfo.processInfo.arguments.contains("-FFRecoveryFixture")
     }
 
+    static var wantsBrowserDemo: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFBrowserFixture")
+    }
+
+    /// Two real saved bundles in the app's Documents directory, each with the
+    /// real thumbnail the editor's save writes. The names carry a Phase28
+    /// prefix so a rerun replaces only its own fixtures.
+    @discardableResult
+    static func prepareBrowserDocuments() -> URL? {
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        if let existing = try? FileManager.default.contentsOfDirectory(
+            at: documents,
+            includingPropertiesForKeys: nil
+        ) {
+            for url in existing {
+                let name = url.lastPathComponent
+                if name.hasPrefix("Phase28") || name.hasPrefix("Untitled") {
+                    try? FileManager.default.removeItem(at: url)
+                }
+            }
+        }
+
+        var sapphire = FFDocument.benchSample.document
+        sapphire.name = "Sapphire Ring"
+        let sapphireURL = documents.appendingPathComponent("Phase28 Sapphire.ffp")
+        guard (try? FFDocumentStore().save(
+            sapphire,
+            to: sapphireURL,
+            thumbnail: FFPThumbnail.png(for: sapphire)
+        )) != nil else {
+            return nil
+        }
+
+        var emerald = FFDocument.benchSample.document
+        emerald.name = "Emerald Brooch"
+        if let stoneID = emerald.rootNodes.first(where: { $0.kind == .stone })?.id {
+            emerald.updateNode(withID: stoneID) { node in
+                node.transform.translation.y += 4
+            }
+        }
+        let emeraldURL = documents.appendingPathComponent("Phase28 Emerald.ffp")
+        guard (try? FFDocumentStore().save(
+            emerald,
+            to: emeraldURL,
+            thumbnail: FFPThumbnail.png(for: emerald)
+        )) != nil else {
+            return nil
+        }
+        return documents
+    }
+
     /// A saved bench sample plus two journal snapshots that moved the stone to
     /// y = 47.5 mm. The saved bundle still has it at 40 mm, so restoring the
     /// journal is visible both in the gizmo readout and in the recovered state.

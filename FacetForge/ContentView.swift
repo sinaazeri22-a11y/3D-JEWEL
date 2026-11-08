@@ -6,6 +6,7 @@ struct ContentView: View {
     var body: some View {
         FFAppShell(
             launchRecoveryDemo: FFLaunchFixtures.wantsRecoveryDemo,
+            launchBrowserDemo: FFLaunchFixtures.wantsBrowserDemo,
             onOpenGallery: { showingGallery = true }
         )
             .background(

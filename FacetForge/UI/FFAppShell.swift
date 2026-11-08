@@ -209,6 +209,9 @@ struct FFAppShell: View {
     /// Test surface: seeds a saved bundle with a crash journal before opening
     /// it through the real reopen path. The shipping app leaves it false.
     var launchRecoveryDemo: Bool = false
+    /// Test surface: seeds two real saved bundles so the browser suite lists
+    /// only fixtures it controls. The shipping app leaves it false.
+    var launchBrowserDemo: Bool = false
     var onOpenGallery: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
@@ -220,6 +223,7 @@ struct FFAppShell: View {
     @State private var camera = FFCamera.standard
     @State private var namedView: FFNamedView? = .iso
     @State private var lengthUnit: FFLengthUnit = .millimetres
+    @State private var showingBrowser = false
     /// The document and scene owner. The shell keeps layout and input only.
     @StateObject private var session = FFEditorSession()
 
@@ -251,6 +255,10 @@ struct FFAppShell: View {
                     onSave: { try? session.save() },
                     onReopen: { try? session.reopen() },
                     onUndo: { session.undo() },
+                    onOpenBrowser: {
+                        session.refreshLibrary()
+                        showingBrowser = true
+                    },
                     onOpenGallery: onOpenGallery
                 )
 
@@ -353,6 +361,10 @@ struct FFAppShell: View {
                 if launchRecoveryDemo, let url = FFLaunchFixtures.prepareRecoveryDocument() {
                     try? session.reopen(from: url)
                 }
+                if launchBrowserDemo {
+                    FFLaunchFixtures.prepareBrowserDocuments()
+                    session.refreshLibrary()
+                }
                 session.startAutosave()
             }
             .onDisappear {
@@ -362,6 +374,15 @@ struct FFAppShell: View {
                 if phase == .background {
                     session.autosaveForBackground()
                 }
+            }
+            .onOpenURL { url in
+                try? session.openExternalDocument(at: url)
+            }
+            .sheet(isPresented: $showingBrowser) {
+                FFDocumentBrowserView(
+                    session: session,
+                    onClose: { showingBrowser = false }
+                )
             }
         }
         .preferredColorScheme(.dark)
@@ -379,6 +400,7 @@ private struct FFAppBar: View {
     let onSave: () -> Void
     let onReopen: () -> Void
     let onUndo: () -> Void
+    let onOpenBrowser: () -> Void
     let onOpenGallery: () -> Void
 
     private var isCompact: Bool {
@@ -464,19 +486,17 @@ private struct FFAppBar: View {
             .accessibilityIdentifier("shell.openGallery")
             .accessibilityLabel("Open component gallery")
 
-            // The export stub is the one app-bar control that can be dropped
-            // at the 640 pt minimum, where five 44 pt document buttons, the
-            // gallery and the title already fill the bar.
+            // The documents entry takes the slot of the old inert export stub,
+            // so the bar's 640 pt budget is unchanged. Below the medium band
+            // Files remains the way in; the browser is deliberately not another
+            // control competing for that row.
             if !isCompact {
-                Button(action: {}) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(FFPalette.textSecondary.color)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(FFPressStyle())
-                .accessibilityLabel("Export")
+                documentButton(
+                    "folder",
+                    label: "Documents",
+                    identifier: "shell.document.browser",
+                    action: onOpenBrowser
+                )
             }
         }
         .padding(.horizontal, FFSpace.sm)

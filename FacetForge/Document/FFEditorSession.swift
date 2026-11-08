@@ -65,6 +65,9 @@ final class FFEditorSession: ObservableObject {
     @Published private(set) var autosaveMessage: String?
     /// Whether the current document has edits that are not in its bundle yet.
     private(set) var isDirty = false
+    /// The recents list the browser renders. The session refreshes it; the
+    /// browser never scans or mutates the folder itself.
+    @Published private(set) var library: [FFDocumentSummary] = []
 
     private(set) var documentSession: FFDocumentSession
     private let store: FFDocumentStore
@@ -509,6 +512,18 @@ final class FFEditorSession: ObservableObject {
         try reopen(from: documentURL)
     }
 
+    /// Opens a document handed over by Files. The security-scoped access is
+    /// held only for the read; the session keeps working from the in-place URL,
+    /// which the document declaration in Info.plist permits.
+    func openExternalDocument(at url: URL) throws {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if scoped { url.stopAccessingSecurityScopedResource() }
+        }
+        try reopen(from: url)
+        refreshLibrary()
+    }
+
     /// Loads a document from disk and replaces the scene, modes and selection.
     /// The undo history is reset: undo must never reach across a reopened file.
     func reopen(from url: URL) throws {
@@ -530,6 +545,51 @@ final class FFEditorSession: ObservableObject {
                 ? "Reopened \(url.lastPathComponent)"
                 : "Recovered last good save · \(url.lastPathComponent)"
         }
+    }
+
+    // MARK: - Document library
+
+    /// Rescans the folder that holds the open document. A new, unsaved
+    /// document browses the app's Documents directory.
+    func refreshLibrary() {
+        library = FFDocumentLibrary(directory: libraryDirectory).documents()
+    }
+
+    var libraryDirectory: URL {
+        documentURL?.deletingLastPathComponent() ?? Self.documentsDirectory
+    }
+
+    /// Renames a document on disk. Renaming the open document retargets the
+    /// session, including its journal, without clearing unsaved edits.
+    @discardableResult
+    func renameDocument(at url: URL, to name: String) throws -> URL {
+        let renamed = try FFDocumentLibrary(directory: libraryDirectory).rename(url, to: name)
+        if documentURL?.standardizedFileURL == url.standardizedFileURL {
+            documentURL = renamed
+            journal = FFEditJournal(directory: FFEditJournal.defaultDirectory(for: renamed))
+            journalSnapshotCount = journal?.entryCount ?? 0
+            documentStatus = "Renamed \(renamed.lastPathComponent)"
+        }
+        refreshLibrary()
+        return renamed
+    }
+
+    /// Copies a document. The copy is a new file with no recovery state.
+    @discardableResult
+    func duplicateDocument(at url: URL) throws -> URL {
+        let copy = try FFDocumentLibrary(directory: libraryDirectory).duplicate(url)
+        refreshLibrary()
+        return copy
+    }
+
+    /// Removes a document. The open document is protected here rather than in
+    /// the view, so a stale cell cannot delete the file the session is editing.
+    func deleteDocument(at url: URL) throws {
+        if documentURL?.standardizedFileURL == url.standardizedFileURL {
+            throw FFLibraryError.cannotModifyOpenDocument
+        }
+        try FFDocumentLibrary(directory: libraryDirectory).delete(url)
+        refreshLibrary()
     }
 
     // MARK: - Crash recovery
@@ -615,10 +675,13 @@ final class FFEditorSession: ObservableObject {
         recoveryOffer = nil
     }
 
-    static var defaultDocumentURL: URL {
-        let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+    static var documentsDirectory: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return directory.appendingPathComponent("Untitled.ffp")
+    }
+
+    static var defaultDocumentURL: URL {
+        documentsDirectory.appendingPathComponent("Untitled.ffp")
     }
 
     /// Flattens the document's node tree into the flat scene the renderer
