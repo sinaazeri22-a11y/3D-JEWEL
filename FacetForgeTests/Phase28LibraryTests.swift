@@ -232,6 +232,29 @@ final class Phase28LibraryTests: XCTestCase {
         XCTAssertFalse(fileManager.fileExists(atPath: FFEditJournal.defaultDirectory(for: url).path))
     }
 
+    func testAScannedCellIdentifiesTheOpenDocumentAndCannotDeleteIt() throws {
+        let directory = try temporaryDirectory()
+        defer { try? fileManager.removeItem(at: directory) }
+        let open = try savedDocument(in: directory, named: "Open")
+        let session = FFEditorSession(document: FFDocument(), autosaveInterval: 0)
+        try session.reopen(from: open)
+        session.refreshLibrary()
+
+        // A folder scan marks a package as a directory, so its URL carries a
+        // trailing slash. The browser selects cells by that URL and passes it
+        // to the session's commands; it must still be the open document.
+        let scanned = try XCTUnwrap(session.library.first { $0.fileName == "Open" })
+        let hinted = URL(fileURLWithPath: open.path, isDirectory: true)
+        XCTAssertTrue(hinted.absoluteString.hasSuffix("/"), "the fixture is not directory-hinted")
+        XCTAssertEqual(scanned.url, open, "the scan's URL is a different identity than the saved file")
+        XCTAssertEqual(FFDocumentLibrary.canonicalURL(hinted), open)
+
+        XCTAssertThrowsError(try session.deleteDocument(at: hinted)) { error in
+            XCTAssertEqual(error as? FFLibraryError, .cannotModifyOpenDocument)
+        }
+        XCTAssertTrue(fileManager.fileExists(atPath: open.path), "a hinted URL deleted the open document")
+    }
+
     func testTheSessionRefusesToDeleteTheOpenDocument() throws {
         let directory = try temporaryDirectory()
         defer { try? fileManager.removeItem(at: directory) }

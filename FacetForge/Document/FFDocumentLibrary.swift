@@ -60,7 +60,7 @@ struct FFDocumentLibrary {
         }
         return entries
             .filter { $0.pathExtension.lowercased() == "ffp" }
-            .compactMap { summary(for: $0) }
+            .compactMap { summary(for: Self.canonicalURL($0)) }
             .sorted {
                 if $0.modifiedAt != $1.modifiedAt {
                     return $0.modifiedAt > $1.modifiedAt
@@ -70,12 +70,29 @@ struct FFDocumentLibrary {
     }
 
     func summary(for url: URL) -> FFDocumentSummary? {
+        let url = Self.canonicalURL(url)
         let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
         return FFDocumentSummary(
             url: url,
             modifiedAt: values?.contentModificationDate ?? Date.distantPast,
             thumbnail: thumbnailData(at: url)
         )
+    }
+
+    /// A scan of the folder hands back directory-hinted URLs (a trailing slash)
+    /// for packages, while a save, rename or open produces the plain file URL.
+    /// They are the same file but not the same `URL`, so every identity the
+    /// browser compares — selection, rename, duplicate, delete — must use one
+    /// form. This is that form.
+    static func canonicalURL(_ url: URL) -> URL {
+        URL(fileURLWithPath: url.path)
+    }
+
+    /// Whether two URLs name the same bundle, whichever of them came from a
+    /// folder scan. Used for every destructive or retargeting decision, so a
+    /// directory-hinted URL can never slip past the open-document guard.
+    static func isSameDocument(_ lhs: URL, _ rhs: URL) -> Bool {
+        canonicalURL(lhs).standardizedFileURL == canonicalURL(rhs).standardizedFileURL
     }
 
     /// Renames the bundle and carries its recovery siblings to the new base
@@ -89,8 +106,8 @@ struct FFDocumentLibrary {
         let target = directory
             .appendingPathComponent(base)
             .appendingPathExtension("ffp")
-        if target.standardizedFileURL == url.standardizedFileURL {
-            return url
+        if Self.isSameDocument(target, url) {
+            return Self.canonicalURL(url)
         }
         guard !fileManager.fileExists(atPath: target.path) else {
             throw FFLibraryError.nameTaken(base)

@@ -564,7 +564,7 @@ final class FFEditorSession: ObservableObject {
     @discardableResult
     func renameDocument(at url: URL, to name: String) throws -> URL {
         let renamed = try FFDocumentLibrary(directory: libraryDirectory).rename(url, to: name)
-        if documentURL?.standardizedFileURL == url.standardizedFileURL {
+        if let current = documentURL, FFDocumentLibrary.isSameDocument(current, url) {
             documentURL = renamed
             journal = FFEditJournal(directory: FFEditJournal.defaultDirectory(for: renamed))
             journalSnapshotCount = journal?.entryCount ?? 0
@@ -585,7 +585,7 @@ final class FFEditorSession: ObservableObject {
     /// Removes a document. The open document is protected here rather than in
     /// the view, so a stale cell cannot delete the file the session is editing.
     func deleteDocument(at url: URL) throws {
-        if documentURL?.standardizedFileURL == url.standardizedFileURL {
+        if let current = documentURL, FFDocumentLibrary.isSameDocument(current, url) {
             throw FFLibraryError.cannotModifyOpenDocument
         }
         try FFDocumentLibrary(directory: libraryDirectory).delete(url)
