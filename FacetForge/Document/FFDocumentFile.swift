@@ -13,16 +13,10 @@ final class FFDocumentFile: UIDocument {
     private(set) var content: FFPBundleContent?
 
     override func contents(forType typeName: String) throws -> Any {
-        guard let fileURL else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        return try FileWrapper(url: fileURL, options: .immediate)
+        try FileWrapper(url: fileURL, options: .immediate)
     }
 
     override func load(fromContents contents: Any, ofType typeName: String?) throws {
-        guard let fileURL else {
-            throw CocoaError(.fileNoSuchFile)
-        }
         let loaded = try FFDocumentStore().loadContent(from: fileURL)
         content = loaded
         document = loaded.document
