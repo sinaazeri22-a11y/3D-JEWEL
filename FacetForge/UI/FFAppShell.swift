@@ -320,7 +320,14 @@ struct FFAppShell: View {
                                     ($0.id, session.nodeCount(inLayer: $0.id))
                                 }
                             ),
+                            nodes: session.rootNodes,
                             selection: $session.selection,
+                            onSelectNode: { session.selectNodeFromTree($0) },
+                            onRenameNode: { session.renameNode($0, to: $1) },
+                            onAddGroup: { session.addObjectGroup() },
+                            onNestNode: { session.moveNode($0, into: $1) },
+                            onMoveNode: { session.moveNode($0, by: $1) },
+                            isNodeLocked: { session.isLocked(nodeID: $0) },
                             onAddLayer: { session.addLayer() },
                             onSetCurrentLayer: { session.setCurrentLayer($0) },
                             onToggleLayerVisibility: { id in
@@ -1254,7 +1261,14 @@ private struct FFInspector: View {
     let layerSets: [FFLayerSet]
     let activeLayerSetID: UUID?
     let layerCounts: [UUID: Int]
+    let nodes: [FFNode]
     @Binding var selection: FFSelectionState
+    let onSelectNode: (UUID) -> Void
+    let onRenameNode: (UUID, String) -> Bool
+    let onAddGroup: () -> Void
+    let onNestNode: (UUID, UUID) -> Bool
+    let onMoveNode: (UUID, Int) -> Void
+    let isNodeLocked: (UUID) -> Bool
     let onAddLayer: () -> Void
     let onSetCurrentLayer: (UUID) -> Void
     let onToggleLayerVisibility: (UUID) -> Void
@@ -1499,6 +1513,21 @@ private struct FFInspector: View {
                         .accessibilityIdentifier("layer.current")
                     }
                 }
+
+                // Phase 32's object tree. It sits directly under Layers so the
+                // two document structures are adjacent; every command routes
+                // to the session and the panel owns only search and the rename
+                // sheet's draft.
+                FFObjectTreePanel(
+                    nodes: nodes,
+                    selection: selection,
+                    isLocked: isNodeLocked,
+                    onSelect: onSelectNode,
+                    onRename: onRenameNode,
+                    onAddGroup: onAddGroup,
+                    onNest: onNestNode,
+                    onMove: onMoveNode
+                )
 
                 // Phase 17's touch controls. iPadOS has no Shift-click on
                 // touch and no modifier-click API, so Multi is the extend

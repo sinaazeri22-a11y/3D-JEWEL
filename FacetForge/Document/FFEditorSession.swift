@@ -41,6 +41,10 @@ final class FFEditorSession: ObservableObject {
     /// it is drawn, whether it can be edited, and its wireframe colour.
     @Published private(set) var layers: [FFLayer]
     @Published private(set) var currentLayerID: UUID?
+    /// The document's root nodes, published so the Phase 32 object tree
+    /// redraws when a node is renamed, reordered or nested. The scene alone
+    /// cannot drive the tree: a container has no renderable node of its own.
+    @Published private(set) var rootNodes: [FFNode]
     /// Phase 31's named layer-state snapshots and the active one. Both are
     /// document state: a set switch is one undoable edit and reaches the save
     /// file and journal through the same commit path as any node edit.
@@ -113,6 +117,7 @@ final class FFEditorSession: ObservableObject {
         self.displayModes = initial.displayModes
         self.layers = initial.layers
         self.currentLayerID = initial.currentLayerID
+        self.rootNodes = initial.rootNodes
         self.layerSets = initial.layerSets
         self.activeLayerSetID = initial.activeLayerSetID
         self.measurements = initial.measurements.map(\.measurement)
@@ -403,6 +408,81 @@ final class FFEditorSession: ObservableObject {
         syncDocumentState()
     }
 
+    // MARK: - Object tree
+
+    /// Selects a node from the object tree. Multi remains the touch extend
+    /// contract, so a row tap in Multi mode toggles membership exactly like a
+    /// viewport click.
+    @discardableResult
+    func selectNodeFromTree(_ id: UUID, extend: Bool = false) -> Bool {
+        guard documentSession.document.node(withID: id) != nil else { return false }
+        selection.click(id, extend: extend || selection.isMultiSelect)
+        return true
+    }
+
+    /// Renames one node. A locked layer rejects the edit, and a blank or
+    /// unchanged name is not a command at all.
+    @discardableResult
+    func renameNode(_ id: UUID, to rawName: String) -> Bool {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty,
+              let node = documentSession.document.node(withID: id),
+              node.name != name,
+              !isLocked(nodeID: id)
+        else { return false }
+        let changed = documentSession.perform("Rename \(node.name)") { document in
+            _ = document.updateNode(withID: id) { $0.name = name }
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "Renamed \(node.name) to \(name)"
+        return true
+    }
+
+    /// Adds an empty group container. Phase 32 needs a destination the tree can
+    /// drag a solid into; grouping an existing selection and ungrouping are the
+    /// next phase's commands.
+    @discardableResult
+    func addObjectGroup(named name: String? = nil) -> UUID? {
+        let group = FFNode(
+            name: name ?? FFObjectTree.newGroupName(in: documentSession.document),
+            layerID: currentLayerID
+        )
+        let changed = documentSession.perform("Add group \(group.name)") { document in
+            document.rootNodes.append(group)
+        }
+        guard changed else { return nil }
+        syncDocumentState()
+        documentStatus = "Added \(group.name)"
+        return group.id
+    }
+
+    /// Nests a node into a group through the one commit path, so the move is
+    /// undoable and reaches the journal like any other edit.
+    @discardableResult
+    func moveNode(_ id: UUID, into parentID: UUID) -> Bool {
+        guard !isLocked(nodeID: id) else { return false }
+        let changed = documentSession.perform("Move into group") { document in
+            _ = document.moveNode(id, into: parentID)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        return true
+    }
+
+    /// Reorders the selected node among its siblings. The panel's Up and Down
+    /// routes pass -1 and +1; the document clamps and reports whether it moved.
+    @discardableResult
+    func moveNode(_ id: UUID, by offset: Int) -> Bool {
+        guard !isLocked(nodeID: id) else { return false }
+        let changed = documentSession.perform("Reorder object") { document in
+            _ = document.moveNode(id, by: offset)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        return true
+    }
+
     /// Rebuilds every published value that is derived from the document. The
     /// document session remains the only owner; this is the projection the
     /// shell renders.
@@ -412,6 +492,7 @@ final class FFEditorSession: ObservableObject {
         displayModes = document.displayModes
         layers = document.layers
         currentLayerID = document.currentLayerID
+        rootNodes = document.rootNodes
         layerSets = document.layerSets
         activeLayerSetID = document.activeLayerSetID
         measurements = document.measurements.map(\.measurement)

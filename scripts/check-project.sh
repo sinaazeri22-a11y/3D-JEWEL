@@ -97,6 +97,7 @@ required = [
     "FacetForgeTests/Phase29InterchangeTests.swift",
     "FacetForgeTests/Phase30PrecisionTests.swift",
     "FacetForgeTests/Phase31LayerSetTests.swift",
+    "FacetForgeTests/Phase32ObjectTreeTests.swift",
     "FacetForgeTests/FFPJSONSchemaValidator.swift",
     "FacetForgeUITests/LaunchTests.swift",
     "FacetForgeUITests/GalleryTests.swift",
@@ -109,6 +110,7 @@ required = [
     "FacetForgeUITests/Phase27RecoveryUITests.swift",
     "FacetForgeUITests/Phase28BrowserUITests.swift",
     "FacetForgeUITests/Phase31LayerSetUITests.swift",
+    "FacetForgeUITests/Phase32ObjectTreeUITests.swift",
 ]
 for rel in required:
     if not (root / rel).exists():
@@ -226,6 +228,8 @@ if project.exists():
         "A10000000000000000000077 /* FFPDocumentBundle.swift in Sources */",
         "A10000000000000000000079 /* FFPThumbnail.swift in Sources */",
         "A10000000000000000000087 /* FFOBJInterchange.swift in Sources */",
+        "A1000000000000000000008B /* FFObjectTree.swift in Sources */",
+        "A1000000000000000000008D /* FFObjectTreePanel.swift in Sources */",
         "A2000000000000000000003C /* FFPJSONSchemaValidator.swift in Sources */",
         "A2000000000000000000003E /* Phase25FileFormatTests.swift in Sources */",
         "A20000000000000000000040 /* Phase26ReliabilityTests.swift in Sources */",
@@ -234,11 +238,13 @@ if project.exists():
         "A20000000000000000000049 /* Phase29InterchangeTests.swift in Sources */",
         "A2000000000000000000004C /* Phase30PrecisionTests.swift in Sources */",
         "A2000000000000000000004E /* Phase31LayerSetTests.swift in Sources */",
+        "A2000000000000000000004F /* Phase32ObjectTreeTests.swift in Sources */",
         "A2000000000000000000003B /* Phase24TouchTests.swift in Sources */",
         "A30000000000000000000025 /* Phase24HitTargetUITests.swift in Sources */",
         "A30000000000000000000027 /* Phase27RecoveryUITests.swift in Sources */",
         "A30000000000000000000029 /* Phase28BrowserUITests.swift in Sources */",
         "A3000000000000000000002B /* Phase31LayerSetUITests.swift in Sources */",
+        "A3000000000000000000002D /* Phase32ObjectTreeUITests.swift in Sources */",
         "PRODUCT_BUNDLE_IDENTIFIER = com.shahroodazerov.facetforge.tests;",
         "PRODUCT_BUNDLE_IDENTIFIER = com.shahroodazerov.facetforge.uitests;",
         'TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FacetForge.app/FacetForge";',
