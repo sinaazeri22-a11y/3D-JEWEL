@@ -100,7 +100,9 @@ final class Phase30PrecisionTests: XCTestCase {
         ]
 
         for kind in FFMeasurementKind.allCases {
-            let measurement = FFMeasurement(kind: kind, points: points)
+            // A committed measurement has exactly its kind's point count; a
+            // spare point would make it incomplete and display an em dash.
+            let measurement = FFMeasurement(kind: kind, points: Array(points.prefix(kind.pointCount)))
             for unit in FFLengthUnit.allCases {
                 let text = measurement.displayText(unit)
                 if kind.isAngular {
@@ -131,15 +133,27 @@ final class Phase30PrecisionTests: XCTestCase {
 
         for value in samples {
             let once = FFPrecision.roundedLengthMM(value)
-            XCTAssertEqual(FFPrecision.roundedLengthMM(once), once, accuracy: 0)
+            XCTAssertEqual(
+                FFPrecision.roundedLengthMM(once),
+                once,
+                accuracy: 1e-12,
+                "rerounding \(value) moved it"
+            )
             XCTAssertEqual(
                 FFPrecision.roundedLengthMM(-value),
                 -once,
                 accuracy: 1e-12,
                 "rounding must be symmetric for \(value)"
             )
-            let remainder = once.truncatingRemainder(dividingBy: FFPrecision.lengthIncrementMM)
-            XCTAssertTrue(FFMath.isZero(remainder, tolerance: 1e-9), "\(once) is off the 0.001 mm grid")
+            // The grid test is on the ratio, not a remainder: a value like
+            // 1e6 mm divided by 0.001 mm has no exact binary remainder.
+            let gridIndex = once / FFPrecision.lengthIncrementMM
+            XCTAssertEqual(
+                gridIndex,
+                gridIndex.rounded(),
+                accuracy: 1e-6,
+                "\(once) is off the 0.001 mm grid"
+            )
         }
 
         // Half away from zero, so two values that differ only in sign round to

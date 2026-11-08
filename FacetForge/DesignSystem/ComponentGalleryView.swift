@@ -50,7 +50,7 @@ struct ComponentGalleryView: View {
                                 label: "Wall thickness",
                                 value: $invalidValue,
                                 unit: "mm",
-                                error: "Below the 0.150 mm minimum for this alloy"
+                                error: "Below the 0.15 mm minimum for this alloy"
                             )
                         }
                     }
@@ -73,7 +73,7 @@ struct ComponentGalleryView: View {
 
                     section("Panel", identifier: "panel") {
                         FFPanel(title: "Ring builder", subtitle: "Comfort fit", trailing: "2.4 g") {
-                            Text("Rail 18.000 mm · head four-prong · seat 1.200 mm")
+                            Text("Rail 18.00 mm · head four-prong · seat 1.20 mm")
                                 .font(FFType.monoSmall)
                                 .foregroundStyle(FFPalette.textSecondary.color)
                         }
@@ -85,14 +85,14 @@ struct ComponentGalleryView: View {
                                 title: "Solitaire",
                                 subtitle: "Ring · 1 stone",
                                 systemImage: "circle",
-                                trailing: "18.000 mm",
+                                trailing: "18.0 mm",
                                 isSelected: true
                             )
                             FFListRow(
                                 title: "Prong",
                                 subtitle: "Head · four prong",
                                 systemImage: "diamond",
-                                trailing: "1.200 mm"
+                                trailing: "1.2 mm"
                             )
                         }
                     }
@@ -243,7 +243,7 @@ enum FFComponentFixtures {
                 size: CGSize(width: 340, height: 168),
                 view: card {
                     FFPanel(title: "Ring builder", subtitle: "Comfort fit", trailing: "2.4 g") {
-                        Text("Rail 18.000 mm · four-prong head")
+                        Text("Rail 18.00 mm · four-prong head")
                             .font(FFType.monoSmall)
                             .foregroundStyle(FFPalette.textSecondary.color)
                     }
@@ -258,7 +258,7 @@ enum FFComponentFixtures {
                             title: "Solitaire",
                             subtitle: "Ring · 1 stone",
                             systemImage: "circle",
-                            trailing: "18.000 mm",
+                            trailing: "18.0 mm",
                             isSelected: true
                         )
                         FFListRow(title: "Prong", subtitle: "Head · four prong", systemImage: "diamond")
