@@ -39,7 +39,7 @@ final class Phase32ObjectTreeUITests: XCTestCase {
         drag(stone, to: group)
         XCTAssertTrue(
             waitFor(timeout: 15, { ((stone.value as? String) ?? "").contains("level 2") }),
-            "Stone was not nested under the group; value='\(stone.value ?? ""'"
+            "Stone was not nested under the group; value='\(stone.value ?? "")'"
         )
         XCTAssertTrue(
             ((group.value as? String) ?? "").contains("1 child"),
@@ -50,7 +50,7 @@ final class Phase32ObjectTreeUITests: XCTestCase {
         drag(shank, to: group)
         XCTAssertTrue(
             waitFor(timeout: 15, { ((shank.value as? String) ?? "").contains("level 2") }),
-            "Shank was not nested under the group; value='\(shank.value ?? ""'"
+            "Shank was not nested under the group; value='\(shank.value ?? "")'"
         )
         XCTAssertTrue(
             ((group.value as? String) ?? "").contains("2 children"),
