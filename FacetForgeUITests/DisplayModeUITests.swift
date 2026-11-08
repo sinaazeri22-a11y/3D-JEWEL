@@ -56,6 +56,14 @@ final class DisplayModeUITests: XCTestCase {
         XCTAssertTrue(topChip.waitForExistence(timeout: 15), "the Top pane has no mode chip")
         XCTAssertTrue(topChip.label.contains("Shaded"), "a new pane should open Shaded")
 
+        // The four-up switch re-lays the HUD. Tapping while that layout is still
+        // settling drops the press without cycling the mode, so wait for the
+        // chip to be hittable and let the animation finish first.
+        XCTAssertTrue(
+            waitUntilHittable(chip, timeout: 15),
+            "the Perspective mode chip is not hittable after the four-up switch"
+        )
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         chip.tap()
         XCTAssertTrue(waitForLabel(chip, "Technical", "Perspective did not reach Technical"))
         XCTAssertTrue(
@@ -86,6 +94,16 @@ final class DisplayModeUITests: XCTestCase {
             return false
         }
         return true
+    }
+
+    @MainActor
+    private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.exists && element.isHittable { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return element.exists && element.isHittable
     }
 
     private func element(_ identifier: String, _ app: XCUIApplication) -> XCUIElement {

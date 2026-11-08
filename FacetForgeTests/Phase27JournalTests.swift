@@ -195,7 +195,13 @@ final class Phase27JournalTests: XCTestCase {
         session.startAutosave()
         defer { session.stopAutosave() }
 
-        RunLoop.main.run(until: Date().addingTimeInterval(0.7))
+        // Poll for the timer rather than assuming a fixed window is enough on a
+        // loaded simulator. A timer that never fires still fails, and the
+        // assertions below still prove the save reached the bundle.
+        let deadline = Date().addingTimeInterval(5)
+        while session.lastAutosaveAt == nil && Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        }
         XCTAssertNotNil(session.lastAutosaveAt, "the autosave timer never fired")
         XCTAssertFalse(session.isDirty)
         XCTAssertEqual(
