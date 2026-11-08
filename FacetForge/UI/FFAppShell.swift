@@ -322,9 +322,16 @@ struct FFAppShell: View {
                             ),
                             nodes: session.rootNodes,
                             selection: $session.selection,
+                            transformInfo: session.transformInfo(),
+                            canGroupSelection: session.canGroupSelection,
+                            canUngroupSelection: session.canUngroupSelection(),
                             onSelectNode: { session.selectNodeFromTree($0) },
                             onRenameNode: { session.renameNode($0, to: $1) },
                             onAddGroup: { session.addObjectGroup() },
+                            onGroupSelection: { session.groupSelection() },
+                            onUngroupSelection: { session.ungroupSelection() },
+                            onSetPivot: { session.setPivot($0, preset: $1) },
+                            onSetRotation: { session.setRotation($0, degreesX: $1, degreesY: $2, degreesZ: $3) },
                             onNestNode: { session.moveNode($0, into: $1) },
                             onMoveNode: { session.moveNode($0, by: $1) },
                             isNodeLocked: { session.isLocked(nodeID: $0) },
@@ -1263,9 +1270,16 @@ private struct FFInspector: View {
     let layerCounts: [UUID: Int]
     let nodes: [FFNode]
     @Binding var selection: FFSelectionState
+    let transformInfo: FFTransformInfo?
+    let canGroupSelection: Bool
+    let canUngroupSelection: Bool
     let onSelectNode: (UUID) -> Void
     let onRenameNode: (UUID, String) -> Bool
     let onAddGroup: () -> Void
+    let onGroupSelection: () -> Void
+    let onUngroupSelection: () -> Void
+    let onSetPivot: (UUID, FFPivotPreset) -> Void
+    let onSetRotation: (UUID, Double, Double, Double) -> Bool
     let onNestNode: (UUID, UUID) -> Bool
     let onMoveNode: (UUID, Int) -> Void
     let isNodeLocked: (UUID) -> Bool
@@ -1525,8 +1539,22 @@ private struct FFInspector: View {
                     onSelect: onSelectNode,
                     onRename: onRenameNode,
                     onAddGroup: onAddGroup,
+                    onGroupSelection: onGroupSelection,
+                    onUngroupSelection: onUngroupSelection,
+                    canGroupSelection: canGroupSelection,
+                    canUngroupSelection: canUngroupSelection,
                     onNest: onNestNode,
                     onMove: onMoveNode
+                )
+
+                // Phase 33's pivot and inheritance surface. It sits under the
+                // tree because both panels read the same document; every
+                // command still routes to the session.
+                FFTransformPanel(
+                    info: transformInfo,
+                    lengthUnit: lengthUnit,
+                    onSetPivot: onSetPivot,
+                    onSetRotation: onSetRotation
                 )
 
                 // Phase 17's touch controls. iPadOS has no Shift-click on

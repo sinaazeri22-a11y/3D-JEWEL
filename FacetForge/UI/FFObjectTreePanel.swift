@@ -14,6 +14,10 @@ struct FFObjectTreePanel: View {
     let onSelect: (UUID) -> Void
     let onRename: (UUID, String) -> Bool
     let onAddGroup: () -> Void
+    let onGroupSelection: () -> Void
+    let onUngroupSelection: () -> Void
+    let canGroupSelection: Bool
+    let canUngroupSelection: Bool
     let onNest: (UUID, UUID) -> Bool
     let onMove: (UUID, Int) -> Void
 
@@ -46,13 +50,18 @@ struct FFObjectTreePanel: View {
             subtitle: "\(FFObjectTree.rows(in: nodes, query: "").count) objects · document order",
             trailing: selection.selectedIDs.isEmpty ? nil : "\(selection.selectedIDs.count) selected"
         ) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: FFSpace.xxs) {
-                    commandChips
+            // Two rows of three: the container commands first, then the row
+            // commands. Every chip is its own 44 pt target and none of them
+            // shares a hit region with a tree row below.
+            VStack(alignment: .leading, spacing: FFSpace.xxs) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: FFSpace.xxs) { containerChips }
+                    VStack(alignment: .leading, spacing: FFSpace.xxs) { containerChips }
                 }
 
-                VStack(alignment: .leading, spacing: FFSpace.xxs) {
-                    commandChips
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: FFSpace.xxs) { rowChips }
+                    VStack(alignment: .leading, spacing: FFSpace.xxs) { rowChips }
                 }
             }
 
@@ -72,7 +81,7 @@ struct FFObjectTreePanel: View {
 
             }
 
-            Text("Drag a row onto a group to nest it. Up and Down reorder the selected row.")
+            Text("Drag a row onto a group to nest it. Group wraps the selection; Up and Down reorder it.")
                 .font(FFType.monoSmall)
                 .foregroundStyle(FFPalette.textTertiary.color)
         }
@@ -94,15 +103,38 @@ struct FFObjectTreePanel: View {
     }
 
     @ViewBuilder
-    private var commandChips: some View {
+    private var containerChips: some View {
+        // Phase 32's empty-group command keeps its identifier; Phase 33 adds
+        // the two commands that act on an existing selection.
         FFChip(
-            title: "Group",
+            title: "New Group",
             systemImage: "folder.badge.plus",
             accessibilityIdentifier: "tree.addGroup"
         ) {
             onAddGroup()
         }
 
+        FFChip(
+            title: "Group",
+            systemImage: "folder.badge.gearshape",
+            accessibilityIdentifier: "tree.groupSelection"
+        ) {
+            onGroupSelection()
+        }
+        .disabled(!canGroupSelection)
+
+        FFChip(
+            title: "Ungroup",
+            systemImage: "folder.badge.minus",
+            accessibilityIdentifier: "tree.ungroup"
+        ) {
+            onUngroupSelection()
+        }
+        .disabled(!canUngroupSelection)
+    }
+
+    @ViewBuilder
+    private var rowChips: some View {
         FFChip(
             title: "Rename",
             systemImage: "pencil",

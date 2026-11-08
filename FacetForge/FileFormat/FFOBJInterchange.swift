@@ -639,7 +639,7 @@ enum FFOBJExporter {
         var parts: [Part] = []
 
         func visit(_ node: FFNode, groupName: String?, parent: Mat4) {
-            let world = parent * node.transform.matrix
+            let world = parent * node.localMatrix
             let isMesh = node.geometry?.mesh != nil
             let group = groupName ?? node.name
             if let payload = node.geometry?.mesh,

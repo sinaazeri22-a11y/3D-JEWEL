@@ -134,11 +134,61 @@ struct FFTransform: Codable, Equatable, Sendable {
     }
 
     var matrix: Mat4 {
-        Mat4.translation(translation.vector)
+        matrix(pivot: Vec3(x: 0, y: 0, z: 0))
+    }
+
+    /// The same T * R * S composition with rotation and scale taken about
+    /// `pivot`, a point in the node's own local space:
+    ///
+    ///     T * P * Rz * Ry * Rx * S * P⁻¹
+    ///
+    /// A zero pivot multiplies out to exactly the old matrix, so every
+    /// document written before Phase 33 keeps its geometry untouched. The
+    /// pivot is one owner: the renderer, the OBJ exporter and the thumbnail
+    /// all compose through this method rather than each adding a translation.
+    func matrix(pivot: Vec3) -> Mat4 {
+        // A zero pivot keeps the exact operation order every document used
+        // before Phase 33, so no pivot-less scene or snapshot fixture can drift.
+        guard pivot != Vec3(x: 0, y: 0, z: 0) else {
+            return Mat4.translation(translation.vector)
+                * Mat4.rotationZ(rotation.z)
+                * Mat4.rotationY(rotation.y)
+                * Mat4.rotationX(rotation.x)
+                * Mat4.scale(x: scale.x, y: scale.y, z: scale.z)
+        }
+        return Mat4.translation(translation.vector)
+            * Mat4.translation(pivot)
             * Mat4.rotationZ(rotation.z)
             * Mat4.rotationY(rotation.y)
             * Mat4.rotationX(rotation.x)
             * Mat4.scale(x: scale.x, y: scale.y, z: scale.z)
+            * Mat4.translation(Vec3(x: -pivot.x, y: -pivot.y, z: -pivot.z))
+    }
+
+    /// Decomposes a matrix into the pivot-aware form above, keeping `pivot`
+    /// fixed. The linear part decides R and S, and the translation is solved
+    /// from M = T + P − R·S·P, so a gizmo drag on a node with a pivot moves it
+    /// without the pivot's offset being baked into its translation.
+    init(matrix: Mat4, pivot: Vec3) {
+        let bare = FFTransform(matrix: matrix)
+        guard pivot != Vec3(x: 0, y: 0, z: 0) else {
+            self = bare
+            return
+        }
+        let rotationScale = Mat4.rotationZ(bare.rotation.z)
+            * Mat4.rotationY(bare.rotation.y)
+            * Mat4.rotationX(bare.rotation.x)
+            * Mat4.scale(x: bare.scale.x, y: bare.scale.y, z: bare.scale.z)
+        let turned = rotationScale.transformedVector(pivot)
+        self.init(
+            translation: FFPoint3(
+                x: matrix.m03 - pivot.x + turned.x,
+                y: matrix.m13 - pivot.y + turned.y,
+                z: matrix.m23 - pivot.z + turned.z
+            ),
+            rotation: bare.rotation,
+            scale: bare.scale
+        )
     }
 }
 
@@ -329,6 +379,12 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
     /// before Phase 20 still decode; a missing assignment belongs to the
     /// document's first layer.
     var layerID: UUID?
+    /// The point this node's rotation and scale turn about, in its own local
+    /// space. Optional so schema-1 documents written before Phase 33 still
+    /// decode; a missing pivot is the origin, which is exactly how every
+    /// earlier transform composed. Encoding omits it while it is nil, so an
+    /// untouched document's canonical hash does not move.
+    var pivot: FFPoint3?
     var children: [FFNode]
 
     init(
@@ -340,6 +396,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         materialID: UUID? = nil,
         kind: FFPickKind? = nil,
         layerID: UUID? = nil,
+        pivot: FFPoint3? = nil,
         children: [FFNode] = []
     ) {
         self.id = id
@@ -350,6 +407,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         self.materialID = materialID
         self.kind = kind
         self.layerID = layerID
+        self.pivot = pivot
         self.children = children
     }
 

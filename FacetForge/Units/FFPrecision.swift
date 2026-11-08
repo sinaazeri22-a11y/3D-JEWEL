@@ -78,11 +78,16 @@ enum FFPrecision {
     }
 
     /// A length rounded in millimetres, then converted and fixed to that unit's
-    /// display precision.
+    /// display precision. `lengthNumber` is the same value without the unit, for
+    /// a readout that carries one label for several coordinates.
     static func lengthString(millimetres: Double, unit: FFLengthUnit) -> String {
+        lengthNumber(millimetres: millimetres, unit: unit) + " " + unit.label
+    }
+
+    static func lengthNumber(millimetres: Double, unit: FFLengthUnit) -> String {
         let roundedMM = roundedLengthMM(millimetres)
         let converted = unit.value(fromMillimetres: roundedMM)
-        return fixed(converted, decimals: decimals(for: unit)) + " " + unit.label
+        return fixed(converted, decimals: decimals(for: unit))
     }
 
     static func angleString(degrees: Double) -> String {

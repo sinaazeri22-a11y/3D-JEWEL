@@ -94,7 +94,7 @@ enum FFPThumbnail {
         var polylines: [WorldPolyline] = []
 
         func visit(_ node: FFNode, parent: Mat4) {
-            let world = parent * node.transform.matrix
+            let world = parent * node.localMatrix
             if let payload = node.geometry?.mesh {
                 let positions = payload.positions.map { world.transformedPoint($0.vector) }
                 for triangle in payload.triangles {

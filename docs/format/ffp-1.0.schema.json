@@ -143,6 +143,7 @@
         "isVisible": { "type": "boolean" },
         "materialID": { "$ref": "#/$defs/uuid" },
         "layerID": { "$ref": "#/$defs/uuid" },
+        "pivot": { "$ref": "#/$defs/point3" },
         "kind": { "type": "string" },
         "children": {
           "type": "array",

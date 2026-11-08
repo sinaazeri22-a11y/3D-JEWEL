@@ -483,6 +483,122 @@ final class FFEditorSession: ObservableObject {
         return true
     }
 
+    // MARK: - Grouping and pivots
+
+    /// The selection can be wrapped in one group. The rule lives on the
+    /// document so the panel's enabled state and the command cannot disagree.
+    var canGroupSelection: Bool {
+        documentSession.document.canGroup(Array(selection.selectedIDs))
+    }
+
+    func canUngroupSelection() -> Bool {
+        guard selection.selectedIDs.count == 1, let id = selection.selectedIDs.first else {
+            return false
+        }
+        return documentSession.document.canUngroup(id)
+    }
+
+    /// Wraps the selected siblings in one new container. Grouping is a single
+    /// `perform` block, so undo, autosave and the journal treat it exactly like
+    /// a rename or a nest; the group starts selected because it is the result.
+    @discardableResult
+    func groupSelection() -> UUID? {
+        let ids = Array(selection.selectedIDs)
+        guard !ids.isEmpty, canGroupSelection else {
+            documentStatus = "Select sibling objects to group"
+            return nil
+        }
+        var created: UUID?
+        let changed = documentSession.perform("Group objects") { document in
+            created = document.groupSelection(
+                ids,
+                named: FFObjectTree.newGroupName(in: document),
+                layerID: currentLayerID
+            )
+        }
+        guard changed, let created else {
+            documentStatus = "Could not group the selection"
+            return nil
+        }
+        selection.select([created])
+        syncDocumentState()
+        documentStatus = "Grouped \(ids.count) objects"
+        return created
+    }
+
+    /// Dissolves the selected group and selects its former children. One undo
+    /// step restores the group and every child's world transform.
+    @discardableResult
+    func ungroupSelection() -> Bool {
+        guard selection.selectedIDs.count == 1, let id = selection.selectedIDs.first,
+              let group = documentSession.document.node(withID: id), group.geometry == nil
+        else {
+            documentStatus = "Select a group to ungroup"
+            return false
+        }
+        guard documentSession.document.canUngroup(id) else {
+            documentStatus = "Cannot ungroup \(group.name)"
+            return false
+        }
+        let childIDs = group.children.map(\.id)
+        let changed = documentSession.perform("Ungroup \(group.name)") { document in
+            _ = document.ungroup(id)
+        }
+        guard changed else {
+            documentStatus = "Could not ungroup \(group.name)"
+            return false
+        }
+        selection.select(childIDs)
+        syncDocumentState()
+        documentStatus = "Ungrouped \(group.name)"
+        return true
+    }
+
+    /// Applies one axis preset to the selected node's pivot. The preset point is
+    /// computed from the node's own subtree, and the edit is one step.
+    @discardableResult
+    func setPivot(_ id: UUID, preset: FFPivotPreset) -> Bool {
+        guard let node = documentSession.document.node(withID: id) else { return false }
+        let changed = documentSession.perform("Pivot \(node.name)") { document in
+            _ = document.applyPivotPreset(id, preset: preset)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "Pivot \(preset.label) · \(node.name)"
+        return true
+    }
+
+    /// Replaces a node's local rotation from degree fields. A group turns about
+    /// its pivot and every child follows rigidly through the composed chain.
+    @discardableResult
+    func setRotation(_ id: UUID, degreesX: Double, degreesY: Double, degreesZ: Double) -> Bool {
+        guard let node = documentSession.document.node(withID: id),
+              degreesX.isFinite, degreesY.isFinite, degreesZ.isFinite
+        else { return false }
+        let radians = FFPoint3(
+            x: FFMath.radians(degreesX),
+            y: FFMath.radians(degreesY),
+            z: FFMath.radians(degreesZ)
+        )
+        let changed = documentSession.perform("Rotate \(node.name)") { document in
+            _ = document.setRotation(id, radians: radians)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "Rotated \(node.name)"
+        return true
+    }
+
+    /// The transform panel's read-only projection, or nil when the selection is
+    /// not a single node. Inheritance and the world value come from the
+    /// document, never from a second sum in the view.
+    func transformInfo() -> FFTransformInfo? {
+        guard selection.selectedIDs.count == 1, let id = selection.selectedIDs.first else {
+            return nil
+        }
+        return documentSession.document.transformInfo(for: id)
+    }
+
     /// Rebuilds every published value that is derived from the document. The
     /// document session remains the only owner; this is the projection the
     /// shell renders.
@@ -639,27 +755,18 @@ final class FFEditorSession: ObservableObject {
 
     /// The node's parent world matrix, or identity for a root. A gizmo matrix
     /// is in world space; the document stores local transforms, so a nested
-    /// node must have its parent's transform removed before the commit.
+    /// node must have its parent's transform removed before the commit. The
+    /// node's pivot is kept: the conversion solves T for the pivot-aware form
+    /// so a drag on a pivot-bearing node does not bake the pivot offset into
+    /// its translation.
     private func localTransform(for nodeID: UUID, world: Mat4) -> FFTransform {
-        guard let parent = parentWorldTransform(of: nodeID),
+        let document = documentSession.document
+        let pivot = document.node(withID: nodeID)?.effectivePivot.vector
+            ?? Vec3(x: 0, y: 0, z: 0)
+        guard let parent = document.parentWorldMatrix(of: nodeID),
               let inverse = parent.inverse()
-        else { return FFTransform(matrix: world) }
-        return FFTransform(matrix: inverse * world)
-    }
-
-    private func parentWorldTransform(of nodeID: UUID) -> Mat4? {
-        func search(_ node: FFNode, parent: Mat4) -> Mat4? {
-            if node.id == nodeID { return parent }
-            let world = parent * node.transform.matrix
-            for child in node.children {
-                if let found = search(child, parent: world) { return found }
-            }
-            return nil
-        }
-        for root in documentSession.document.rootNodes {
-            if let found = search(root, parent: .identity) { return found }
-        }
-        return nil
+        else { return FFTransform(matrix: world, pivot: pivot) }
+        return FFTransform(matrix: inverse * world, pivot: pivot)
     }
 
     /// Saves to `url`, or to the last known URL. A document that has never been
@@ -912,7 +1019,7 @@ final class FFEditorSession: ObservableObject {
         var nodes: [FFRenderNode] = []
 
         func visit(_ node: FFNode, parent: Mat4) {
-            let world = parent * node.transform.matrix
+            let world = parent * node.localMatrix
             if case .mesh(let payload)? = node.geometry,
                let mesh = payload.mesh,
                let renderMesh = FFRenderMesh(mesh: mesh) {
