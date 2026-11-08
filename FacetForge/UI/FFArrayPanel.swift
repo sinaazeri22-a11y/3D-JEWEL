@@ -24,7 +24,7 @@ struct FFArrayPanel: View {
             title: "Duplicate & array",
             subtitle: info.map { "\($0.name) · \($0.parameters.kind.label)" }
                 ?? "One object at a time",
-            trailing: info?.parameters.isLocked == true ? "locked" : nil
+            trailing: info?.isLocked == true ? "locked" : nil
         ) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: FFSpace.xxs) { creationChips }
