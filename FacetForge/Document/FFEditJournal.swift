@@ -9,11 +9,10 @@ struct FFJournalSnapshot: Codable, Equatable, Sendable {
 
 /// The crash journal for one document.
 ///
-/// Every committed edit schedules a snapshot in a hidden sibling directory.
-/// The write is delayed by at most one second so a drag does not encode the
-/// whole document on every frame, but the snapshot's `recordedAt` is the moment
-/// of the edit, not the moment of the write. A kill can therefore lose at most
-/// the in-flight second, which is the Phase 27 acceptance bound.
+/// Every committed edit writes a snapshot in a hidden sibling directory. The
+/// write is synchronous: an edit that is merely queued can be lost by a kill
+/// before the queue runs. The snapshot's `recordedAt` is the moment of the
+/// edit, so the recovery offer can state its real age.
 ///
 /// Retention is five snapshots: writing the sixth deletes the oldest. A corrupt
 /// entry is skipped when looking for the newest good state, so a torn write can

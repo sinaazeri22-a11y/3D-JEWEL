@@ -72,19 +72,15 @@ final class FFEditorSession: ObservableObject {
     /// rewrites a future minor writer's fields alongside this version's.
     private var preservation: FFPBundlePreservation?
 
-    /// Phase 27's autosave and journal policy. Both intervals are injectable so
-    /// the tests do not have to wait thirty seconds for a save.
+    /// Phase 27's autosave policy. The interval is injectable so the tests do
+    /// not have to wait thirty seconds for a save. Journal writes are not
+    /// delayed at all: a committed edit must survive a kill before the next
+    /// run-loop turn, so each one is written synchronously.
     static let defaultAutosaveInterval: TimeInterval = 30
-    static let defaultJournalWriteDelay: TimeInterval = 1
     private let autosaveInterval: TimeInterval
-    private let journalWriteDelay: TimeInterval
     private let now: () -> Date
     private var journal: FFEditJournal?
     private var autosaveTimer: Timer?
-    private var journalFlushWorkItem: DispatchWorkItem?
-    private var pendingJournalDocument: FFDocument?
-    private var pendingJournalRecordedAt: Date?
-    private var lastJournalWriteAt = Date.distantPast
     /// True while a load is replacing the whole document. Those transitions are
     /// not edits and must not create recovery snapshots of the file being
     /// opened or of a document the user explicitly discarded.
@@ -97,14 +93,12 @@ final class FFEditorSession: ObservableObject {
         documentURL: URL? = nil,
         store: FFDocumentStore = FFDocumentStore(),
         autosaveInterval: TimeInterval = FFEditorSession.defaultAutosaveInterval,
-        journalWriteDelay: TimeInterval = FFEditorSession.defaultJournalWriteDelay,
         now: @escaping () -> Date = { Date() }
     ) {
         let sample = FFDocument.benchSample
         let initial = document ?? sample.document
         self.store = store
         self.autosaveInterval = autosaveInterval
-        self.journalWriteDelay = journalWriteDelay
         self.now = now
         self.documentSession = FFDocumentSession(document: initial)
         self.scene = Self.scene(from: initial)
@@ -479,7 +473,6 @@ final class FFEditorSession: ObservableObject {
             autosaveMessage = nil
             return false
         }
-        flushJournal()
         do {
             try saveDocument(to: nil, isAutosave: true)
             return true
@@ -556,9 +549,7 @@ final class FFEditorSession: ObservableObject {
         isDirty = true
         documentStatus = "Restored \(offer.snapshotCount) unsaved "
             + (offer.snapshotCount == 1 ? "edit" : "edits")
-        pendingJournalDocument = documentSession.document
-        pendingJournalRecordedAt = now()
-        writePendingJournal()
+        recordJournalSnapshot(at: now())
         return true
     }
 
@@ -568,48 +559,22 @@ final class FFEditorSession: ObservableObject {
         journal?.clear()
         journalSnapshotCount = 0
         recoveryOffer = nil
-        pendingJournalDocument = nil
-        pendingJournalRecordedAt = nil
         documentStatus = "Discarded unsaved edits"
         return true
     }
 
-    /// Writes the pending snapshot now. The shell calls this together with the
-    /// background autosave.
-    func flushJournal() {
-        writePendingJournal()
-    }
-
     private func noteEdit() {
         isDirty = true
-        guard journal != nil else { return }
-        pendingJournalDocument = documentSession.document
-        pendingJournalRecordedAt = now()
-        let elapsed = now().timeIntervalSince(lastJournalWriteAt)
-        if elapsed >= journalWriteDelay {
-            writePendingJournal()
-        } else if journalFlushWorkItem == nil {
-            let item = DispatchWorkItem { [weak self] in
-                self?.writePendingJournal()
-            }
-            journalFlushWorkItem = item
-            DispatchQueue.main.asyncAfter(
-                deadline: .now() + (journalWriteDelay - elapsed),
-                execute: item
-            )
-        }
+        recordJournalSnapshot(at: now())
     }
 
-    private func writePendingJournal() {
-        journalFlushWorkItem?.cancel()
-        journalFlushWorkItem = nil
-        guard let journal, let snapshot = pendingJournalDocument else { return }
-        let recordedAt = pendingJournalRecordedAt ?? now()
-        pendingJournalDocument = nil
-        pendingJournalRecordedAt = nil
+    /// Writes the current document as the next journal snapshot. Synchronous on
+    /// purpose: an edit that is only queued for later can be lost by a kill
+    /// before the queue runs, which is exactly what this phase forbids.
+    private func recordJournalSnapshot(at date: Date) {
+        guard let journal else { return }
         do {
-            try journal.record(snapshot, at: recordedAt)
-            lastJournalWriteAt = now()
+            try journal.record(documentSession.document, at: date)
             journalSnapshotCount = journal.entryCount
         } catch {
             autosaveMessage = "Journal write failed: \(error.localizedDescription)"
@@ -622,22 +587,12 @@ final class FFEditorSession: ObservableObject {
         self.journal = journal
         journalSnapshotCount = 0
         recoveryOffer = nil
-        pendingJournalDocument = nil
-        pendingJournalRecordedAt = nil
-        journalFlushWorkItem?.cancel()
-        journalFlushWorkItem = nil
-        lastJournalWriteAt = .distantPast
     }
 
     private func attachJournalAfterOpen(at url: URL) {
         let journal = FFEditJournal(directory: FFEditJournal.defaultDirectory(for: url))
         self.journal = journal
         journalSnapshotCount = journal.entryCount
-        pendingJournalDocument = nil
-        pendingJournalRecordedAt = nil
-        journalFlushWorkItem?.cancel()
-        journalFlushWorkItem = nil
-        lastJournalWriteAt = .distantPast
         if let snapshot = journal.latest() {
             recoveryOffer = FFJournalRecoveryOffer(
                 document: snapshot.document,
@@ -658,11 +613,6 @@ final class FFEditorSession: ObservableObject {
         journal = nil
         journalSnapshotCount = 0
         recoveryOffer = nil
-        pendingJournalDocument = nil
-        pendingJournalRecordedAt = nil
-        journalFlushWorkItem?.cancel()
-        journalFlushWorkItem = nil
-        lastJournalWriteAt = .distantPast
     }
 
     static var defaultDocumentURL: URL {

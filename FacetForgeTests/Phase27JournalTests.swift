@@ -20,7 +20,6 @@ final class Phase27JournalTests: XCTestCase {
         let session = FFEditorSession(
             document: FFDocument(),
             autosaveInterval: 30,
-            journalWriteDelay: 0.15
         )
         try session.reopen(from: url)
         XCTAssertNil(session.recoveryOffer, "a clean document must not offer recovery")
@@ -34,10 +33,8 @@ final class Phase27JournalTests: XCTestCase {
             session.document.stateHash != baseline.stateHash,
             "the edits did not change the document"
         )
-        // The first edit writes immediately; the second is throttled to the
-        // journal's one-second policy. Waiting past that policy is the only
-        // delay before the simulated kill.
-        Thread.sleep(forTimeInterval: 0.45)
+        // Each committed edit is journaled synchronously, so the simulated
+        // kill needs no waiting and no flush to see both edits.
         let journal = FFEditJournal(directory: FFEditJournal.defaultDirectory(for: url))
         XCTAssertEqual(journal.entryCount, 2, "both edits did not reach the journal")
 
@@ -46,7 +43,6 @@ final class Phase27JournalTests: XCTestCase {
         let revived = FFEditorSession(
             document: FFDocument(),
             autosaveInterval: 30,
-            journalWriteDelay: 0.15
         )
         try revived.reopen(from: url)
 
@@ -160,7 +156,6 @@ final class Phase27JournalTests: XCTestCase {
         let session = FFEditorSession(
             document: FFDocument(),
             autosaveInterval: 0.2,
-            journalWriteDelay: 0.1
         )
         try session.reopen(from: url)
         XCTAssertFalse(session.autosaveIfNeeded(), "a clean document was rewritten")
@@ -194,7 +189,6 @@ final class Phase27JournalTests: XCTestCase {
         let session = FFEditorSession(
             document: FFDocument(),
             autosaveInterval: 0.2,
-            journalWriteDelay: 0.1
         )
         try session.reopen(from: url)
         XCTAssertTrue(session.setDisplayMode(.technical, for: "front"))
@@ -223,16 +217,13 @@ final class Phase27JournalTests: XCTestCase {
         let writer = FFEditorSession(
             document: FFDocument(),
             autosaveInterval: 30,
-            journalWriteDelay: 0.1
         )
         try writer.reopen(from: url)
         XCTAssertTrue(writer.setDisplayMode(.wireframe, for: "perspective"))
-        Thread.sleep(forTimeInterval: 0.25)
 
         let reader = FFEditorSession(
             document: FFDocument(),
             autosaveInterval: 30,
-            journalWriteDelay: 0.1
         )
         try reader.reopen(from: url)
         XCTAssertNotNil(reader.recoveryOffer)
@@ -257,17 +248,14 @@ final class Phase27JournalTests: XCTestCase {
         let writer = FFEditorSession(
             document: FFDocument(),
             autosaveInterval: 30,
-            journalWriteDelay: 0.1
         )
         try writer.reopen(from: url)
         XCTAssertTrue(writer.setDisplayMode(.wireframe, for: "perspective"))
-        Thread.sleep(forTimeInterval: 0.25)
         let edited = writer.document.stateHash
 
         let reader = FFEditorSession(
             document: FFDocument(),
             autosaveInterval: 30,
-            journalWriteDelay: 0.1
         )
         try reader.reopen(from: url)
         XCTAssertTrue(reader.restoreRecovery())
