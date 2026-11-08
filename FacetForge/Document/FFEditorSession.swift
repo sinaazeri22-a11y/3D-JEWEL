@@ -401,6 +401,26 @@ final class FFEditorSession: ObservableObject {
         return true
     }
 
+    // MARK: - Interchange
+
+    /// Imports a parsed OBJ as one undoable document edit. Materials and nodes
+    /// are appended to the current layer; the session, not the view, owns the
+    /// commit and the journal, so an import is undone and autosaved like any
+    /// other edit.
+    @discardableResult
+    func importOBJ(_ asset: FFOBJAsset, label: String = "OBJ") -> Int {
+        let built = FFOBJDocumentBuilder.build(asset, layerID: currentLayerID)
+        guard !built.nodes.isEmpty else { return 0 }
+        let changed = documentSession.perform("Import \(label)") { document in
+            document.materials.append(contentsOf: built.materials)
+            document.rootNodes.append(contentsOf: built.nodes)
+        }
+        guard changed else { return 0 }
+        syncDocumentState()
+        documentStatus = "Imported \(label) · \(built.nodes.count) objects"
+        return built.nodes.count
+    }
+
     @discardableResult
     func undo() -> Bool {
         guard documentSession.undo() else { return false }
