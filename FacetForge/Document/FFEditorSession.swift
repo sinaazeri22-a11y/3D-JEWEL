@@ -41,6 +41,11 @@ final class FFEditorSession: ObservableObject {
     /// it is drawn, whether it can be edited, and its wireframe colour.
     @Published private(set) var layers: [FFLayer]
     @Published private(set) var currentLayerID: UUID?
+    /// Phase 31's named layer-state snapshots and the active one. Both are
+    /// document state: a set switch is one undoable edit and reaches the save
+    /// file and journal through the same commit path as any node edit.
+    @Published private(set) var layerSets: [FFLayerSet] = []
+    @Published private(set) var activeLayerSetID: UUID?
     /// Committed measurements, derived from the document. Phase 23 gives them
     /// the same owner as layers and display modes; the measurement tool keeps
     /// only its draft points.
@@ -108,6 +113,8 @@ final class FFEditorSession: ObservableObject {
         self.displayModes = initial.displayModes
         self.layers = initial.layers
         self.currentLayerID = initial.currentLayerID
+        self.layerSets = initial.layerSets
+        self.activeLayerSetID = initial.activeLayerSetID
         self.measurements = initial.measurements.map(\.measurement)
         self.documentStatus = initial.name
         self.recoveryMessage = nil
@@ -182,6 +189,11 @@ final class FFEditorSession: ObservableObject {
         let changed = documentSession.perform("Add layer") { document in
             document.layers.append(layer)
             document.currentLayerID = layer.id
+            // Every set gains the layer so switching to a set that has never
+            // seen it still has a complete, deterministic state for it.
+            for index in document.layerSets.indices {
+                document.layerSets[index].setState(layer.state, forLayer: layer.id)
+            }
         }
         guard changed else { return nil }
         syncLayers()
@@ -211,7 +223,10 @@ final class FFEditorSession: ObservableObject {
         else { return false }
         let changed = documentSession.perform("Layer visibility") { document in
             guard let index = document.layers.firstIndex(where: { $0.id == id }) else { return }
-            document.layers[index].isVisible = isVisible
+            var state = document.layers[index].state
+            state.isVisible = isVisible
+            document.layers[index].apply(state)
+            document.record(state, forLayer: id)
         }
         guard changed else { return false }
         // Visibility is baked into the derived scene, so the rebuild is what
@@ -227,7 +242,10 @@ final class FFEditorSession: ObservableObject {
         else { return false }
         let changed = documentSession.perform("Layer lock") { document in
             guard let index = document.layers.firstIndex(where: { $0.id == id }) else { return }
-            document.layers[index].isLocked = isLocked
+            var state = document.layers[index].state
+            state.isLocked = isLocked
+            document.layers[index].apply(state)
+            document.record(state, forLayer: id)
         }
         guard changed else { return false }
         syncLayers()
@@ -239,11 +257,110 @@ final class FFEditorSession: ObservableObject {
         guard let layer = documentSession.document.layer(withID: id) else { return false }
         let changed = documentSession.perform("Layer colour \(layer.name)") { document in
             guard let index = document.layers.firstIndex(where: { $0.id == id }) else { return }
-            document.layers[index].color = document.layers[index].nextColor
+            var state = document.layers[index].state
+            state.color = document.layers[index].nextColor
+            document.layers[index].apply(state)
+            document.record(state, forLayer: id)
         }
         guard changed else { return false }
         syncLayers()
         return true
+    }
+
+    /// Phase 31's fourth layer state. The print pipeline lands later; this is
+    /// the stored decision that pipeline will read, saved and undoable like the
+    /// other three states.
+    @discardableResult
+    func setLayerPrintable(_ id: UUID, isPrintable: Bool) -> Bool {
+        guard let layer = documentSession.document.layer(withID: id),
+              layer.isPrintable != isPrintable
+        else { return false }
+        let changed = documentSession.perform("Layer print") { document in
+            guard let index = document.layers.firstIndex(where: { $0.id == id }) else { return }
+            var state = document.layers[index].state
+            state.isPrintable = isPrintable
+            document.layers[index].apply(state)
+            document.record(state, forLayer: id)
+        }
+        guard changed else { return false }
+        syncLayers()
+        return true
+    }
+
+    // MARK: - Layer sets
+
+    var activeLayerSet: FFLayerSet? {
+        documentSession.document.activeLayerSet
+    }
+
+    /// Creates a set from the states currently on screen and activates it. The
+    /// outgoing set already holds those states (every mutation records into it),
+    /// so the snapshot is complete without a capture pass.
+    @discardableResult
+    func addLayerSet(named name: String? = nil) -> UUID? {
+        let document = documentSession.document
+        let set = FFLayerSet.capturing(
+            document.layers,
+            name: name ?? "Set \(document.layerSets.count + 1)"
+        )
+        let changed = documentSession.perform("Add layer set") { draft in
+            draft.layerSets.append(set)
+            draft.activeLayerSetID = set.id
+        }
+        guard changed else { return nil }
+        syncLayers()
+        documentStatus = "Layer set \(set.name)"
+        return set.id
+    }
+
+    /// Applies one set's stored states to the live layers. The incoming set is
+    /// read only: only the live layers change, so every other set keeps exactly
+    /// the visibility it recorded while it was active.
+    @discardableResult
+    func activateLayerSet(_ id: UUID) -> Bool {
+        let document = documentSession.document
+        guard document.activeLayerSetID != id,
+              let target = document.layerSets.first(where: { $0.id == id })
+        else { return false }
+        let changed = documentSession.perform("Layer set \(target.name)") { draft in
+            for entry in target.entries {
+                guard let index = draft.layers.firstIndex(where: { $0.id == entry.layerID }) else {
+                    continue
+                }
+                draft.layers[index].apply(entry.state)
+            }
+            draft.activeLayerSetID = id
+        }
+        guard changed else { return false }
+        syncLayers()
+        documentStatus = "Layer set \(target.name)"
+        return true
+    }
+
+    /// Imports the layer definitions of a document used as a template. A layer
+    /// whose name already exists is left exactly as the user tuned it; only
+    /// missing layers are added, and they join every set. One undo step covers
+    /// the whole template, and an import that adds nothing records no edit.
+    @discardableResult
+    func importLayerTemplate(_ template: FFLayerTemplate) -> Int {
+        var seen = Set(documentSession.document.layers.map { $0.name.lowercased() })
+        let incoming = template.layers.filter { seen.insert($0.name.lowercased()).inserted }
+        guard !incoming.isEmpty else { return 0 }
+
+        var added = 0
+        let changed = documentSession.perform("Import \(template.name) layers") { document in
+            for layer in incoming {
+                document.layers.append(layer)
+                for index in document.layerSets.indices {
+                    document.layerSets[index].setState(layer.state, forLayer: layer.id)
+                }
+                added += 1
+            }
+        }
+        guard changed else { return 0 }
+        syncLayers()
+        documentStatus = "Imported \(added) layers from \(template.name)"
+        return added
     }
 
     /// Moves the current selection to `layerID`. A locked layer rejects the
@@ -295,6 +412,8 @@ final class FFEditorSession: ObservableObject {
         displayModes = document.displayModes
         layers = document.layers
         currentLayerID = document.currentLayerID
+        layerSets = document.layerSets
+        activeLayerSetID = document.activeLayerSetID
         measurements = document.measurements.map(\.measurement)
         if !isLoading {
             noteEdit()

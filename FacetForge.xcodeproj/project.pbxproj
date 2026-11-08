@@ -91,12 +91,14 @@
 		A20000000000000000000047 /* Phase28LibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000048 /* Phase28LibraryTests.swift */; };
 		A20000000000000000000049 /* Phase29InterchangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000004A /* Phase29InterchangeTests.swift */; };
 		A2000000000000000000004C /* Phase30PrecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000004B /* Phase30PrecisionTests.swift */; };
+		A2000000000000000000004E /* Phase31LayerSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000004D /* Phase31LayerSetTests.swift */; };
 		A3000000000000000000001F /* LayerPanelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000001E /* LayerPanelUITests.swift */; };
 		A30000000000000000000021 /* PerformanceHUDUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000020 /* PerformanceHUDUITests.swift */; };
 		A30000000000000000000023 /* Phase23SmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000022 /* Phase23SmokeUITests.swift */; };
 		A30000000000000000000025 /* Phase24HitTargetUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000024 /* Phase24HitTargetUITests.swift */; };
 		A30000000000000000000027 /* Phase27RecoveryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000026 /* Phase27RecoveryUITests.swift */; };
 		A30000000000000000000029 /* Phase28BrowserUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000028 /* Phase28BrowserUITests.swift */; };
+		A3000000000000000000002B /* Phase31LayerSetUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000002A /* Phase31LayerSetUITests.swift */; };
 		A3000000000000000000000B /* LaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000002 /* LaunchTests.swift */; };
 		A3000000000000000000000F /* GalleryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000000E /* GalleryTests.swift */; };
 		A30000000000000000000011 /* AdaptiveShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000010 /* AdaptiveShellTests.swift */; };
@@ -211,12 +213,14 @@
 		A20000000000000000000048 /* Phase28LibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase28LibraryTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000004A /* Phase29InterchangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase29InterchangeTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000004B /* Phase30PrecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase30PrecisionTests.swift; sourceTree = "<group>"; };
+		A2000000000000000000004D /* Phase31LayerSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase31LayerSetTests.swift; sourceTree = "<group>"; };
 		A3000000000000000000001E /* LayerPanelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerPanelUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000020 /* PerformanceHUDUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceHUDUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000022 /* Phase23SmokeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase23SmokeUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000024 /* Phase24HitTargetUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase24HitTargetUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000026 /* Phase27RecoveryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase27RecoveryUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000028 /* Phase28BrowserUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase28BrowserUITests.swift; sourceTree = "<group>"; };
+		A3000000000000000000002A /* Phase31LayerSetUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase31LayerSetUITests.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* FacetForgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FacetForgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000002 /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
 		A3000000000000000000000E /* GalleryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryTests.swift; sourceTree = "<group>"; };
@@ -433,6 +437,7 @@
 				A20000000000000000000048 /* Phase28LibraryTests.swift */,
 				A2000000000000000000004A /* Phase29InterchangeTests.swift */,
 				A2000000000000000000004B /* Phase30PrecisionTests.swift */,
+				A2000000000000000000004D /* Phase31LayerSetTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -455,6 +460,7 @@
 				A30000000000000000000024 /* Phase24HitTargetUITests.swift */,
 				A30000000000000000000026 /* Phase27RecoveryUITests.swift */,
 				A30000000000000000000028 /* Phase28BrowserUITests.swift */,
+				A3000000000000000000002A /* Phase31LayerSetUITests.swift */,
 			);
 			path = FacetForgeUITests;
 			sourceTree = "<group>";
@@ -678,6 +684,7 @@
 				A20000000000000000000047 /* Phase28LibraryTests.swift in Sources */,
 				A20000000000000000000049 /* Phase29InterchangeTests.swift in Sources */,
 				A2000000000000000000004C /* Phase30PrecisionTests.swift in Sources */,
+				A2000000000000000000004E /* Phase31LayerSetTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -700,6 +707,7 @@
 				A30000000000000000000025 /* Phase24HitTargetUITests.swift in Sources */,
 				A30000000000000000000027 /* Phase27RecoveryUITests.swift in Sources */,
 				A30000000000000000000029 /* Phase28BrowserUITests.swift in Sources */,
+				A3000000000000000000002B /* Phase31LayerSetUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -396,6 +396,8 @@ struct FFDocument: Codable, Equatable, Sendable {
         case displayModes
         case layers
         case currentLayerID
+        case layerSets
+        case activeLayerSetID
         case measurements
     }
 
@@ -413,6 +415,11 @@ struct FFDocument: Codable, Equatable, Sendable {
     /// save and reopen.
     var layers: [FFLayer]
     var currentLayerID: UUID?
+    /// Phase 31's named snapshots of the layer states. A file written before
+    /// this field decodes to one Default set capturing its decoded layers, so
+    /// every document can switch sets from the first open.
+    var layerSets: [FFLayerSet]
+    var activeLayerSetID: UUID?
     /// Committed measurements. Phase 19 kept them in the pane's tool session;
     /// Phase 23 makes them document annotations so a measurement is one undo
     /// step and survives save and reopen. Additive in schema 1: a file written
@@ -427,6 +434,8 @@ struct FFDocument: Codable, Equatable, Sendable {
         displayModes: [String: FFDisplayMode] = [:],
         layers: [FFLayer] = [FFLayer.defaultLayer],
         currentLayerID: UUID? = nil,
+        layerSets: [FFLayerSet] = [],
+        activeLayerSetID: UUID? = nil,
         measurements: [FFMeasurementAnnotation] = []
     ) {
         self.schemaVersion = Self.currentSchemaVersion
@@ -437,6 +446,13 @@ struct FFDocument: Codable, Equatable, Sendable {
         self.displayModes = displayModes
         self.layers = layers.isEmpty ? [FFLayer.defaultLayer] : layers
         self.currentLayerID = currentLayerID ?? self.layers.first?.id
+        let resolvedSets = layerSets.isEmpty
+            ? [FFLayerSet.capturing(self.layers, name: "Default")]
+            : layerSets
+        self.layerSets = resolvedSets
+        self.activeLayerSetID = resolvedSets.contains { $0.id == activeLayerSetID }
+            ? activeLayerSetID
+            : resolvedSets.first?.id
         self.measurements = measurements
     }
 
@@ -459,6 +475,14 @@ struct FFDocument: Codable, Equatable, Sendable {
         self.layers = decodedLayers.isEmpty ? [FFLayer.defaultLayer] : decodedLayers
         self.currentLayerID = try container.decodeIfPresent(UUID.self, forKey: .currentLayerID)
             ?? self.layers.first?.id
+        let decodedSets = try container.decodeIfPresent([FFLayerSet].self, forKey: .layerSets) ?? []
+        self.layerSets = decodedSets.isEmpty
+            ? [FFLayerSet.capturing(self.layers, name: "Default")]
+            : decodedSets
+        let decodedActive = try container.decodeIfPresent(UUID.self, forKey: .activeLayerSetID)
+        self.activeLayerSetID = self.layerSets.contains { $0.id == decodedActive }
+            ? decodedActive
+            : self.layerSets.first?.id
         self.measurements = try container.decodeIfPresent(
             [FFMeasurementAnnotation].self,
             forKey: .measurements

@@ -313,6 +313,8 @@ struct FFAppShell: View {
                             scene: session.scene,
                             layers: session.layers,
                             currentLayerID: session.currentLayerID,
+                            layerSets: session.layerSets,
+                            activeLayerSetID: session.activeLayerSetID,
                             layerCounts: Dictionary(
                                 uniqueKeysWithValues: session.layers.map {
                                     ($0.id, session.nodeCount(inLayer: $0.id))
@@ -330,6 +332,13 @@ struct FFAppShell: View {
                                 session.setLayerLocked(id, isLocked: !layer.isLocked)
                             },
                             onCycleLayerColor: { session.cycleLayerColor($0) },
+                            onToggleLayerPrint: { id in
+                                guard let layer = session.layer(withID: id) else { return }
+                                session.setLayerPrintable(id, isPrintable: !layer.isPrintable)
+                            },
+                            onAddLayerSet: { session.addLayerSet() },
+                            onActivateLayerSet: { session.activateLayerSet($0) },
+                            onImportTemplate: { session.importLayerTemplate(.workshop) },
                             onSelectLayer: { session.selectLayer($0) },
                             onAssignToLayer: { session.assignSelection(to: $0) },
                             onCollapse: { inspectorCollapsed = true }
@@ -1242,6 +1251,8 @@ private struct FFInspector: View {
     let scene: FFViewportScene
     let layers: [FFLayer]
     let currentLayerID: UUID?
+    let layerSets: [FFLayerSet]
+    let activeLayerSetID: UUID?
     let layerCounts: [UUID: Int]
     @Binding var selection: FFSelectionState
     let onAddLayer: () -> Void
@@ -1249,6 +1260,10 @@ private struct FFInspector: View {
     let onToggleLayerVisibility: (UUID) -> Void
     let onToggleLayerLock: (UUID) -> Void
     let onCycleLayerColor: (UUID) -> Void
+    let onToggleLayerPrint: (UUID) -> Void
+    let onAddLayerSet: () -> Void
+    let onActivateLayerSet: (UUID) -> Void
+    let onImportTemplate: () -> Void
     let onSelectLayer: (UUID) -> Void
     let onAssignToLayer: (UUID) -> Void
     let onCollapse: () -> Void
@@ -1290,6 +1305,38 @@ private struct FFInspector: View {
             if let currentLayerID { onAssignToLayer(currentLayerID) }
         }
         .disabled(selection.selectedIDs.isEmpty || currentLayer?.isLocked == true)
+    }
+
+    /// The set switcher and the template import. Every control is its own 44 pt
+    /// target inside the same vertical stack as the rows below, so no overlay
+    /// or hit region is shared with a layer row.
+    @ViewBuilder
+    private var layerSetChips: some View {
+        ForEach(Array(layerSets.enumerated()), id: \.element.id) { index, set in
+            FFChip(
+                title: set.name,
+                isSelected: set.id == activeLayerSetID,
+                accessibilityIdentifier: "layer.set.\(index)"
+            ) {
+                onActivateLayerSet(set.id)
+            }
+        }
+
+        FFChip(
+            title: "New set",
+            systemImage: "plus",
+            accessibilityIdentifier: "layer.set.add"
+        ) {
+            onAddLayerSet()
+        }
+
+        FFChip(
+            title: "Template",
+            systemImage: "square.on.square.dashed",
+            accessibilityIdentifier: "layer.template"
+        ) {
+            onImportTemplate()
+        }
     }
 
     var body: some View {
@@ -1335,6 +1382,29 @@ private struct FFInspector: View {
                         VStack(alignment: .leading, spacing: FFSpace.xxs) {
                             layerCommandChips
                         }
+                    }
+
+                    Text("Layer sets")
+                        .font(FFType.monoSmall)
+                        .foregroundStyle(FFPalette.textTertiary.color)
+
+                    // Phase 31's switcher. Switching applies the other set's
+                    // stored states; it never rewrites the set being left.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: FFSpace.xxs) {
+                            layerSetChips
+                        }
+
+                        VStack(alignment: .leading, spacing: FFSpace.xxs) {
+                            layerSetChips
+                        }
+                    }
+
+                    if let activeSet = layerSets.first(where: { $0.id == activeLayerSetID }) {
+                        Text("Set: \(activeSet.name)")
+                            .font(FFType.monoSmall)
+                            .foregroundStyle(FFPalette.textTertiary.color)
+                            .accessibilityIdentifier("layer.set.current")
                     }
 
                     ForEach(Array(layers.enumerated()), id: \.element.id) { index, layer in
@@ -1413,6 +1483,16 @@ private struct FFInspector: View {
                                     isSelected: layer.isLocked
                                 ) {
                                     onToggleLayerLock(layer.id)
+                                }
+
+                                layerIconButton(
+                                    layer.isPrintable ? "printer.fill" : "printer",
+                                    label: "\(layer.name) print",
+                                    identifier: "layer.print.\(index)",
+                                    isSelected: layer.isPrintable,
+                                    value: layer.isPrintable ? "Prints" : "Does not print"
+                                ) {
+                                    onToggleLayerPrint(layer.id)
                                 }
 
                                 Button {
@@ -1667,6 +1747,7 @@ private struct FFInspector: View {
         label: String,
         identifier: String,
         isSelected: Bool,
+        value: String = "",
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -1684,6 +1765,7 @@ private struct FFInspector: View {
         }
         .buttonStyle(FFPressStyle())
         .accessibilityLabel(label)
+        .accessibilityValue(value)
         .accessibilityIdentifier(identifier)
     }
 
