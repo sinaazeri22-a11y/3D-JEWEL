@@ -263,8 +263,8 @@ final class Phase31LayerSetTests: XCTestCase {
     }
 
     func testWorkshopTemplateIsDistinctFromTheBenchLayers() {
-        let benchNames = Set(FFDocument.benchSample.document.layers.map(\.name.lowercased()))
-        let templateNames = Set(FFLayerTemplate.workshop.layers.map(\.name.lowercased()))
+        let benchNames = Set(FFDocument.benchSample.document.layers.map { $0.name.lowercased() })
+        let templateNames = Set(FFLayerTemplate.workshop.layers.map { $0.name.lowercased() })
         XCTAssertTrue(
             templateNames.isDisjoint(with: benchNames),
             "the workshop template would import nothing into the bench sample"
