@@ -385,6 +385,11 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
     /// earlier transform composed. Encoding omits it while it is nil, so an
     /// untouched document's canonical hash does not move.
     var pivot: FFPoint3?
+    /// Phase 34's array parameters for a group whose children are the array's
+    /// members. Optional so schema-1 documents written before Phase 34 still
+    /// decode; a missing array is an ordinary group. Encoding omits it while
+    /// nil, so an untouched document's canonical hash does not move.
+    var array: FFArrayParameters?
     var children: [FFNode]
 
     init(
@@ -397,6 +402,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         kind: FFPickKind? = nil,
         layerID: UUID? = nil,
         pivot: FFPoint3? = nil,
+        array: FFArrayParameters? = nil,
         children: [FFNode] = []
     ) {
         self.id = id
@@ -408,6 +414,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         self.kind = kind
         self.layerID = layerID
         self.pivot = pivot
+        self.array = array
         self.children = children
     }
 

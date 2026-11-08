@@ -323,8 +323,11 @@ struct FFAppShell: View {
                             nodes: session.rootNodes,
                             selection: $session.selection,
                             transformInfo: session.transformInfo(),
+                            arrayInfo: session.arrayInfo(),
                             canGroupSelection: session.canGroupSelection,
                             canUngroupSelection: session.canUngroupSelection(),
+                            canDuplicateSelection: session.canDuplicateSelection,
+                            canArraySelection: session.canArraySelection,
                             onSelectNode: { session.selectNodeFromTree($0) },
                             onRenameNode: { session.renameNode($0, to: $1) },
                             onAddGroup: { session.addObjectGroup() },
@@ -332,6 +335,14 @@ struct FFAppShell: View {
                             onUngroupSelection: { session.ungroupSelection() },
                             onSetPivot: { session.setPivot($0, preset: $1) },
                             onSetRotation: { session.setRotation($0, degreesX: $1, degreesY: $2, degreesZ: $3) },
+                            onDuplicate: { session.duplicateSelection() },
+                            onLinearArray: { session.makeLinearArray() },
+                            onRadialArray: { session.makeRadialArray() },
+                            onAdjustArrayCount: { session.adjustArrayCount($0, by: $1) },
+                            onAdjustArrayOffset: { session.adjustArrayOffset($0, by: $1) },
+                            onSetArrayDirection: { session.setArrayDirection($0, direction: $1) },
+                            onSetArrayAxis: { session.setArrayAxis($0, axis: $1) },
+                            onAdjustArrayAngle: { session.adjustArrayAngle($0, by: $1) },
                             onNestNode: { session.moveNode($0, into: $1) },
                             onMoveNode: { session.moveNode($0, by: $1) },
                             isNodeLocked: { session.isLocked(nodeID: $0) },
@@ -1271,8 +1282,11 @@ private struct FFInspector: View {
     let nodes: [FFNode]
     @Binding var selection: FFSelectionState
     let transformInfo: FFTransformInfo?
+    let arrayInfo: FFArrayInfo?
     let canGroupSelection: Bool
     let canUngroupSelection: Bool
+    let canDuplicateSelection: Bool
+    let canArraySelection: Bool
     let onSelectNode: (UUID) -> Void
     let onRenameNode: (UUID, String) -> Bool
     let onAddGroup: () -> Void
@@ -1280,6 +1294,14 @@ private struct FFInspector: View {
     let onUngroupSelection: () -> Void
     let onSetPivot: (UUID, FFPivotPreset) -> Void
     let onSetRotation: (UUID, Double, Double, Double) -> Bool
+    let onDuplicate: () -> Void
+    let onLinearArray: () -> Void
+    let onRadialArray: () -> Void
+    let onAdjustArrayCount: (UUID, Int) -> Void
+    let onAdjustArrayOffset: (UUID, Double) -> Void
+    let onSetArrayDirection: (UUID, FFAxis) -> Void
+    let onSetArrayAxis: (UUID, FFAxis) -> Void
+    let onAdjustArrayAngle: (UUID, Double) -> Void
     let onNestNode: (UUID, UUID) -> Bool
     let onMoveNode: (UUID, Int) -> Void
     let isNodeLocked: (UUID) -> Bool
@@ -1545,6 +1567,25 @@ private struct FFInspector: View {
                     canUngroupSelection: canUngroupSelection,
                     onNest: onNestNode,
                     onMove: onMoveNode
+                )
+
+                // Phase 34's duplicate and array surface. It sits beside the
+                // tree because the commands act on the selected row, and its
+                // parameter editor appears only for an array group. Every
+                // intent routes to the session.
+                FFArrayPanel(
+                    canDuplicate: canDuplicateSelection,
+                    canArray: canArraySelection,
+                    info: arrayInfo,
+                    lengthUnit: lengthUnit,
+                    onDuplicate: onDuplicate,
+                    onLinear: onLinearArray,
+                    onRadial: onRadialArray,
+                    onAdjustCount: onAdjustArrayCount,
+                    onAdjustOffset: onAdjustArrayOffset,
+                    onSetDirection: onSetArrayDirection,
+                    onSetAxis: onSetArrayAxis,
+                    onAdjustAngle: onAdjustArrayAngle
                 )
 
                 // Phase 33's pivot and inheritance surface. It sits under the

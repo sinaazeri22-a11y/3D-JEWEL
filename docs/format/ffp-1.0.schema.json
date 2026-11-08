@@ -78,6 +78,19 @@
       "type": "string",
       "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
     },
+    "arrayParameters": {
+      "type": "object",
+      "required": ["kind", "count", "offset", "direction", "axis", "totalAngle"],
+      "properties": {
+        "kind": { "enum": ["linear", "radial"] },
+        "count": { "type": "integer", "minimum": 2, "maximum": 100 },
+        "offset": { "type": "number", "minimum": 0 },
+        "direction": { "enum": ["x", "y", "z"] },
+        "axis": { "enum": ["x", "y", "z"] },
+        "totalAngle": { "type": "number", "exclusiveMinimum": 0, "maximum": 360 }
+      },
+      "additionalProperties": true
+    },
     "point3": {
       "type": "object",
       "required": ["x", "y", "z"],
@@ -144,6 +157,7 @@
         "materialID": { "$ref": "#/$defs/uuid" },
         "layerID": { "$ref": "#/$defs/uuid" },
         "pivot": { "$ref": "#/$defs/point3" },
+        "array": { "$ref": "#/$defs/arrayParameters" },
         "kind": { "type": "string" },
         "children": {
           "type": "array",

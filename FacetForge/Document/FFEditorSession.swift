@@ -599,6 +599,171 @@ final class FFEditorSession: ObservableObject {
         return documentSession.document.transformInfo(for: id)
     }
 
+    // MARK: - Duplication and arrays
+
+    /// One selected object can be duplicated or wrapped in an array. The rule
+    /// lives on the document so the panel's enabled state and the command
+    /// cannot disagree, as with grouping.
+    var canDuplicateSelection: Bool {
+        guard selection.selectedIDs.count == 1, let id = selection.selectedIDs.first else {
+            return false
+        }
+        return documentSession.document.canCopyNode(id)
+    }
+
+    var canArraySelection: Bool {
+        canDuplicateSelection
+    }
+
+    /// Copies the selected subtree beside itself in one step and selects the
+    /// copy, because the duplicate is the result the next command acts on.
+    @discardableResult
+    func duplicateSelection() -> UUID? {
+        guard selection.selectedIDs.count == 1, let id = selection.selectedIDs.first,
+              let source = documentSession.document.node(withID: id)
+        else {
+            documentStatus = "Select one object to duplicate"
+            return nil
+        }
+        guard canDuplicateSelection else {
+            documentStatus = "Cannot duplicate \(source.name)"
+            return nil
+        }
+        var created: UUID?
+        let changed = documentSession.perform("Duplicate \(source.name)") { document in
+            created = document.duplicateNode(id)
+        }
+        guard changed, let created else {
+            documentStatus = "Could not duplicate \(source.name)"
+            return nil
+        }
+        selection.select([created])
+        syncDocumentState()
+        documentStatus = "Duplicated \(source.name)"
+        return created
+    }
+
+    @discardableResult
+    func makeLinearArray(
+        count: Int = 3,
+        offset: Double = FFArrayParameters.offsetStep * 10,
+        direction: FFAxis = .x
+    ) -> UUID? {
+        makeArray(
+            parameters: .linear(count: count, offset: offset, direction: direction),
+            status: "Linear array"
+        )
+    }
+
+    @discardableResult
+    func makeRadialArray(
+        count: Int = 12,
+        axis: FFAxis = .y,
+        totalAngle: Double = FFArrayParameters.fullCircle
+    ) -> UUID? {
+        makeArray(
+            parameters: .radial(count: count, axis: axis, totalAngle: totalAngle),
+            status: "Radial array"
+        )
+    }
+
+    /// Builds the array group in one `perform` block and selects it. The group
+    /// is what the parameter panel then edits, so a fresh array is immediately
+    /// adjustable rather than a one-shot result.
+    private func makeArray(parameters: FFArrayParameters, status: String) -> UUID? {
+        guard selection.selectedIDs.count == 1, let id = selection.selectedIDs.first,
+              let source = documentSession.document.node(withID: id)
+        else {
+            documentStatus = "Select one object to array"
+            return nil
+        }
+        guard canArraySelection else {
+            documentStatus = "Cannot array \(source.name)"
+            return nil
+        }
+        var created: UUID?
+        let changed = documentSession.perform("\(status) \(source.name)") { document in
+            created = document.makeArray(id, parameters: parameters)
+        }
+        guard changed, let created else {
+            documentStatus = "Could not array \(source.name)"
+            return nil
+        }
+        selection.select([created])
+        syncDocumentState()
+        documentStatus = "\(parameters.kind.label) array · \(parameters.count) items · \(source.name)"
+        return created
+    }
+
+    /// The array panel's read-only projection, or nil when the selection is not
+    /// an array group.
+    func arrayInfo() -> FFArrayInfo? {
+        guard selection.selectedIDs.count == 1, let id = selection.selectedIDs.first else {
+            return nil
+        }
+        return documentSession.document.arrayInfo(for: id)
+    }
+
+    /// One parameter edit, one undo step. The document refuses an unchanged or
+    /// out-of-range value, so a button held at a limit commits nothing.
+    @discardableResult
+    func updateArray(
+        _ id: UUID,
+        _ edit: (inout FFArrayParameters) -> Void
+    ) -> Bool {
+        guard let node = documentSession.document.node(withID: id),
+              var parameters = node.array,
+              !isLocked(nodeID: id)
+        else { return false }
+        edit(&parameters)
+        guard parameters.isValid else {
+            documentStatus = "Array values are out of range"
+            return false
+        }
+        let changed = documentSession.perform("Edit \(node.name) array") { document in
+            _ = document.setArrayParameters(id, parameters)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(parameters.kind.label) array · \(parameters.count) items"
+        return true
+    }
+
+    @discardableResult
+    func adjustArrayCount(_ id: UUID, by delta: Int) -> Bool {
+        updateArray(id) {
+            $0.count = min(
+                max($0.count + delta, FFArrayParameters.minimumCount),
+                FFArrayParameters.maximumCount
+            )
+        }
+    }
+
+    @discardableResult
+    func adjustArrayOffset(_ id: UUID, by delta: Double) -> Bool {
+        updateArray(id) { $0.offset = max(0, $0.offset + delta) }
+    }
+
+    @discardableResult
+    func adjustArrayAngle(_ id: UUID, by delta: Double) -> Bool {
+        updateArray(id) {
+            $0.totalAngle = min(
+                max($0.totalAngle + delta, 1),
+                FFArrayParameters.fullCircle
+            )
+        }
+    }
+
+    @discardableResult
+    func setArrayDirection(_ id: UUID, direction: FFAxis) -> Bool {
+        updateArray(id) { $0.direction = direction }
+    }
+
+    @discardableResult
+    func setArrayAxis(_ id: UUID, axis: FFAxis) -> Bool {
+        updateArray(id) { $0.axis = axis }
+    }
+
     /// Rebuilds every published value that is derived from the document. The
     /// document session remains the only owner; this is the projection the
     /// shell renders.
