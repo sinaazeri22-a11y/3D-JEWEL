@@ -4,7 +4,10 @@ struct ContentView: View {
     @State private var showingGallery = false
 
     var body: some View {
-        FFAppShell(onOpenGallery: { showingGallery = true })
+        FFAppShell(
+            launchRecoveryDemo: FFLaunchFixtures.wantsRecoveryDemo,
+            onOpenGallery: { showingGallery = true }
+        )
             .background(
                 FFSceneSizeRestrictionsView()
                     .frame(width: 0, height: 0)

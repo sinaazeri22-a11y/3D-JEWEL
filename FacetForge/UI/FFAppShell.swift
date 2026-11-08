@@ -206,8 +206,12 @@ struct FFAppShell: View {
     /// When set, the shell lays itself out at this width instead of the host
     /// width. The layout laboratory uses it; the app leaves it nil.
     var fixedWidth: CGFloat? = nil
+    /// Test surface: seeds a saved bundle with a crash journal before opening
+    /// it through the real reopen path. The shipping app leaves it false.
+    var launchRecoveryDemo: Bool = false
     var onOpenGallery: () -> Void = {}
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTool = "select"
     @State private var toolsCollapsed = false
     @State private var inspectorCollapsed = false
@@ -236,7 +240,8 @@ struct FFAppShell: View {
                 inspectorCollapsed: inspectorCollapsed
             )
 
-            VStack(spacing: 0) {
+            ZStack {
+                VStack(spacing: 0) {
                 FFAppBar(
                     width: width,
                     status: session.documentStatus,
@@ -327,11 +332,37 @@ struct FFAppShell: View {
                     }
                 }
                 .frame(maxHeight: .infinity)
+                }
+
+                if let offer = session.recoveryOffer {
+                    FFRecoveryPromptView(
+                        offer: offer,
+                        onRestore: { session.restoreRecovery() },
+                        onDiscard: { session.discardRecovery() }
+                    )
+                    .transition(.opacity)
+                    .zIndex(1)
+                }
             }
+            .animation(.easeOut(duration: 0.15), value: session.recoveryOffer != nil)
             .frame(width: width, height: proxy.size.height)
             .background(FFPalette.canvas.color)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("shell")
+            .onAppear {
+                if launchRecoveryDemo, let url = FFLaunchFixtures.prepareRecoveryDocument() {
+                    try? session.reopen(from: url)
+                }
+                session.startAutosave()
+            }
+            .onDisappear {
+                session.stopAutosave()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background {
+                    session.autosaveForBackground()
+                }
+            }
         }
         .preferredColorScheme(.dark)
     }

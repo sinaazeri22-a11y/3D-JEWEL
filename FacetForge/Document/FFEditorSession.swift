@@ -1,6 +1,22 @@
 import Combine
 import Foundation
 
+/// What the crash journal offers the next launch of a document. The shell
+/// renders it; only the session decides whether it is offered, applied or
+/// discarded.
+struct FFJournalRecoveryOffer: Equatable, Sendable {
+    var document: FFDocument
+    var recordedAt: Date
+    var snapshotCount: Int
+    var documentName: String
+
+    var detail: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return "\(documentName) · last edit \(formatter.string(from: recordedAt)) · \(snapshotCount) kept"
+    }
+}
+
 /// The owner of the editing document and of everything the viewport draws.
 ///
 /// Phases 13–17 grew scene, selection and visibility state inside the shell.
@@ -37,6 +53,18 @@ final class FFEditorSession: ObservableObject {
     /// Where the document was last saved or loaded from. `nil` for a new bench
     /// sample that has never touched disk.
     @Published private(set) var documentURL: URL?
+    /// Unsaved edits found in the crash journal after a reopen. A non-nil offer
+    /// is the shell's signal to show the recovery prompt; restoring or
+    /// discarding is a session command.
+    @Published private(set) var recoveryOffer: FFJournalRecoveryOffer?
+    /// How many snapshots the journal currently keeps, at most five.
+    @Published private(set) var journalSnapshotCount = 0
+    /// The last successful autosave, and the last autosave failure. Diagnostics
+    /// only; the document status remains the user-facing line.
+    @Published private(set) var lastAutosaveAt: Date?
+    @Published private(set) var autosaveMessage: String?
+    /// Whether the current document has edits that are not in its bundle yet.
+    private(set) var isDirty = false
 
     private(set) var documentSession: FFDocumentSession
     private let store: FFDocumentStore
@@ -44,16 +72,40 @@ final class FFEditorSession: ObservableObject {
     /// rewrites a future minor writer's fields alongside this version's.
     private var preservation: FFPBundlePreservation?
 
+    /// Phase 27's autosave and journal policy. Both intervals are injectable so
+    /// the tests do not have to wait thirty seconds for a save.
+    static let defaultAutosaveInterval: TimeInterval = 30
+    static let defaultJournalWriteDelay: TimeInterval = 1
+    private let autosaveInterval: TimeInterval
+    private let journalWriteDelay: TimeInterval
+    private let now: () -> Date
+    private var journal: FFEditJournal?
+    private var autosaveTimer: Timer?
+    private var journalFlushWorkItem: DispatchWorkItem?
+    private var pendingJournalDocument: FFDocument?
+    private var pendingJournalRecordedAt: Date?
+    private var lastJournalWriteAt = Date.distantPast
+    /// True while a load is replacing the whole document. Those transitions are
+    /// not edits and must not create recovery snapshots of the file being
+    /// opened or of a document the user explicitly discarded.
+    private var isLoading = false
+
     /// A new session. With no document argument the bench sample is loaded and
     /// its stone opens selected, which is the state Phase 17's CI asserts.
     init(
         document: FFDocument? = nil,
         documentURL: URL? = nil,
-        store: FFDocumentStore = FFDocumentStore()
+        store: FFDocumentStore = FFDocumentStore(),
+        autosaveInterval: TimeInterval = FFEditorSession.defaultAutosaveInterval,
+        journalWriteDelay: TimeInterval = FFEditorSession.defaultJournalWriteDelay,
+        now: @escaping () -> Date = { Date() }
     ) {
         let sample = FFDocument.benchSample
         let initial = document ?? sample.document
         self.store = store
+        self.autosaveInterval = autosaveInterval
+        self.journalWriteDelay = journalWriteDelay
+        self.now = now
         self.documentSession = FFDocumentSession(document: initial)
         self.scene = Self.scene(from: initial)
         self.displayModes = initial.displayModes
@@ -92,7 +144,7 @@ final class FFEditorSession: ObservableObject {
             document.displayModes[paneID] = mode
         }
         guard changed else { return false }
-        displayModes = documentSession.document.displayModes
+        syncDocumentState()
         return true
     }
 
@@ -247,6 +299,9 @@ final class FFEditorSession: ObservableObject {
         layers = document.layers
         currentLayerID = document.currentLayerID
         measurements = document.measurements.map(\.measurement)
+        if !isLoading {
+            noteEdit()
+        }
     }
 
     // MARK: - Document commands
@@ -255,26 +310,36 @@ final class FFEditorSession: ObservableObject {
     /// command, not an undoable edit: undo must not resurrect a file the user
     /// discarded before the new document existed.
     func newDocument() {
+        isLoading = true
         let document = FFDocument(name: "Untitled")
         documentSession = FFDocumentSession(document: document)
         syncDocumentState()
+        isLoading = false
+        resetJournal(clearOnDisk: true)
         selection = FFSelectionState()
         documentURL = nil
         preservation = nil
         recoveryMessage = nil
+        isDirty = false
+        autosaveMessage = nil
         documentStatus = "New document"
     }
 
     /// Loads the shipping bench sample as a fresh, unsaved document and selects
     /// its stone, the state the smoke suite then orbits and edits.
     func loadFixture() {
+        isLoading = true
         let sample = FFDocument.benchSample
         documentSession = FFDocumentSession(document: sample.document)
         syncDocumentState()
+        isLoading = false
+        resetJournal(clearOnDisk: true)
         selection = FFSelectionState(selectedIDs: sample.selectedNodeIDs)
         documentURL = nil
         preservation = nil
         recoveryMessage = nil
+        isDirty = false
+        autosaveMessage = nil
         documentStatus = "Fixture loaded"
     }
 
@@ -383,6 +448,10 @@ final class FFEditorSession: ObservableObject {
     /// Saves to `url`, or to the last known URL. A document that has never been
     /// saved goes to the app's Documents directory.
     func save(to url: URL? = nil) throws {
+        try saveDocument(to: url, isAutosave: false)
+    }
+
+    private func saveDocument(to url: URL?, isAutosave: Bool) throws {
         let destination = url ?? documentURL ?? Self.defaultDocumentURL
         try store.save(
             documentSession.document,
@@ -391,7 +460,55 @@ final class FFEditorSession: ObservableObject {
             thumbnail: FFPThumbnail.png(for: documentSession.document)
         )
         documentURL = destination
-        documentStatus = "Saved \(destination.lastPathComponent)"
+        isDirty = false
+        if isAutosave {
+            lastAutosaveAt = now()
+        }
+        autosaveMessage = isAutosave ? "Autosaved \(destination.lastPathComponent)" : nil
+        prepareJournalForSavedDocument(at: destination)
+        documentStatus = isAutosave
+            ? "Autosaved \(destination.lastPathComponent)"
+            : "Saved \(destination.lastPathComponent)"
+    }
+
+    /// Runs one autosave. A save is only written when an edit is pending; an
+    /// idle document does not rewrite its bundle every thirty seconds.
+    @discardableResult
+    func autosaveIfNeeded() -> Bool {
+        guard isDirty else {
+            autosaveMessage = nil
+            return false
+        }
+        flushJournal()
+        do {
+            try saveDocument(to: nil, isAutosave: true)
+            return true
+        } catch {
+            autosaveMessage = "Autosave failed: \(error.localizedDescription)"
+            documentStatus = "Autosave failed"
+            return false
+        }
+    }
+
+    /// The scene-phase hook. Backgrounding is a save point, not a promise that
+    /// the process will get another run-loop turn.
+    func autosaveForBackground() {
+        _ = autosaveIfNeeded()
+    }
+
+    func startAutosave() {
+        stopAutosave()
+        guard autosaveInterval > 0 else { return }
+        let timer = Timer.scheduledTimer(withTimeInterval: autosaveInterval, repeats: true) { [weak self] _ in
+            self?.autosaveIfNeeded()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        autosaveTimer = timer
+    }
+
+    func stopAutosave() {
+        autosaveTimer?.invalidate()
+        autosaveTimer = nil
     }
 
     func reopen() throws {
@@ -403,15 +520,149 @@ final class FFEditorSession: ObservableObject {
     /// The undo history is reset: undo must never reach across a reopened file.
     func reopen(from url: URL) throws {
         let loaded = try store.loadContent(from: url)
+        isLoading = true
         documentSession = FFDocumentSession(document: loaded.document)
         syncDocumentState()
+        isLoading = false
         documentURL = url
         preservation = loaded.preservation
         recoveryMessage = loaded.recovery?.message
         selection = FFSelectionState.initial(for: scene)
-        documentStatus = loaded.recovery == nil
-            ? "Reopened \(url.lastPathComponent)"
-            : "Recovered last good save · \(url.lastPathComponent)"
+        isDirty = false
+        lastAutosaveAt = nil
+        autosaveMessage = nil
+        attachJournalAfterOpen(at: url)
+        if recoveryOffer == nil {
+            documentStatus = loaded.recovery == nil
+                ? "Reopened \(url.lastPathComponent)"
+                : "Recovered last good save · \(url.lastPathComponent)"
+        }
+    }
+
+    // MARK: - Crash recovery
+
+    /// Applies the newest journal snapshot as the live document. The restored
+    /// state is journaled again immediately, so a kill during the resolution of
+    /// a recovery prompt cannot lose the recovered edits.
+    @discardableResult
+    func restoreRecovery() -> Bool {
+        guard let offer = recoveryOffer else { return false }
+        isLoading = true
+        documentSession = FFDocumentSession(document: offer.document)
+        syncDocumentState()
+        isLoading = false
+        selection = FFSelectionState.initial(for: scene)
+        recoveryOffer = nil
+        isDirty = true
+        documentStatus = "Restored \(offer.snapshotCount) unsaved "
+            + (offer.snapshotCount == 1 ? "edit" : "edits")
+        pendingJournalDocument = documentSession.document
+        pendingJournalRecordedAt = now()
+        writePendingJournal()
+        return true
+    }
+
+    @discardableResult
+    func discardRecovery() -> Bool {
+        guard recoveryOffer != nil else { return false }
+        journal?.clear()
+        journalSnapshotCount = 0
+        recoveryOffer = nil
+        pendingJournalDocument = nil
+        pendingJournalRecordedAt = nil
+        documentStatus = "Discarded unsaved edits"
+        return true
+    }
+
+    /// Writes the pending snapshot now. The shell calls this together with the
+    /// background autosave.
+    func flushJournal() {
+        writePendingJournal()
+    }
+
+    private func noteEdit() {
+        isDirty = true
+        guard journal != nil else { return }
+        pendingJournalDocument = documentSession.document
+        pendingJournalRecordedAt = now()
+        let elapsed = now().timeIntervalSince(lastJournalWriteAt)
+        if elapsed >= journalWriteDelay {
+            writePendingJournal()
+        } else if journalFlushWorkItem == nil {
+            let item = DispatchWorkItem { [weak self] in
+                self?.writePendingJournal()
+            }
+            journalFlushWorkItem = item
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + (journalWriteDelay - elapsed),
+                execute: item
+            )
+        }
+    }
+
+    private func writePendingJournal() {
+        journalFlushWorkItem?.cancel()
+        journalFlushWorkItem = nil
+        guard let journal, let snapshot = pendingJournalDocument else { return }
+        let recordedAt = pendingJournalRecordedAt ?? now()
+        pendingJournalDocument = nil
+        pendingJournalRecordedAt = nil
+        do {
+            try journal.record(snapshot, at: recordedAt)
+            lastJournalWriteAt = now()
+            journalSnapshotCount = journal.entryCount
+        } catch {
+            autosaveMessage = "Journal write failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func prepareJournalForSavedDocument(at url: URL) {
+        let journal = FFEditJournal(directory: FFEditJournal.defaultDirectory(for: url))
+        journal.clear()
+        self.journal = journal
+        journalSnapshotCount = 0
+        recoveryOffer = nil
+        pendingJournalDocument = nil
+        pendingJournalRecordedAt = nil
+        journalFlushWorkItem?.cancel()
+        journalFlushWorkItem = nil
+        lastJournalWriteAt = .distantPast
+    }
+
+    private func attachJournalAfterOpen(at url: URL) {
+        let journal = FFEditJournal(directory: FFEditJournal.defaultDirectory(for: url))
+        self.journal = journal
+        journalSnapshotCount = journal.entryCount
+        pendingJournalDocument = nil
+        pendingJournalRecordedAt = nil
+        journalFlushWorkItem?.cancel()
+        journalFlushWorkItem = nil
+        lastJournalWriteAt = .distantPast
+        if let snapshot = journal.latest() {
+            recoveryOffer = FFJournalRecoveryOffer(
+                document: snapshot.document,
+                recordedAt: snapshot.recordedAt,
+                snapshotCount: journalSnapshotCount,
+                documentName: snapshot.document.name
+            )
+            documentStatus = "Unsaved edits found · \(url.lastPathComponent)"
+        } else {
+            recoveryOffer = nil
+        }
+    }
+
+    private func resetJournal(clearOnDisk: Bool) {
+        if clearOnDisk {
+            journal?.clear()
+        }
+        journal = nil
+        journalSnapshotCount = 0
+        recoveryOffer = nil
+        pendingJournalDocument = nil
+        pendingJournalRecordedAt = nil
+        journalFlushWorkItem?.cancel()
+        journalFlushWorkItem = nil
+        lastJournalWriteAt = .distantPast
     }
 
     static var defaultDocumentURL: URL {
