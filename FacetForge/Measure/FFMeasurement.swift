@@ -118,25 +118,22 @@ struct FFMeasurement: Identifiable, Equatable, Sendable {
         guard let value else { return "—" }
         switch kind {
         case .angle:
-            return String(format: "%.2f°", value)
+            return FFPrecision.angleString(degrees: value)
         case .distance:
-            return unit.formatted(millimetres: value, decimals: decimals(for: unit))
+            return FFPrecision.lengthString(millimetres: value, unit: unit)
         case .radius:
-            return "R " + unit.formatted(millimetres: value, decimals: decimals(for: unit))
+            return "R " + FFPrecision.lengthString(millimetres: value, unit: unit)
         case .diameter:
-            return "Ø " + unit.formatted(millimetres: value, decimals: decimals(for: unit))
+            return "Ø " + FFPrecision.lengthString(millimetres: value, unit: unit)
         case .ringInnerDiameter:
             // The inner diameter is what a jeweller quotes, and the US size is
-            // the trade label derived from it (Phase 11's conversion).
-            let diameter = unit.formatted(millimetres: value, decimals: decimals(for: unit))
+            // the trade label derived from it (Phase 11's conversion). The US
+            // size has its own coarser, documented precision.
+            let diameter = FFPrecision.lengthString(millimetres: value, unit: unit)
             let us = FFRingSize(innerDiameterMM: value).usSize
-            return "Ø \(diameter) · US \(String(format: "%.1f", us))"
+            return "Ø \(diameter) · US "
+                + FFPrecision.fixed(us, decimals: FFPrecision.usRingSizeDecimals)
         }
-    }
-
-    /// Inches need a third decimal to stay finer than 0.01 mm.
-    private func decimals(for unit: FFLengthUnit) -> Int {
-        unit == .inches ? 3 : 2
     }
 
     /// Angle at `vertex` between the rays to `a` and `b`, in degrees. A
@@ -146,7 +143,9 @@ struct FFMeasurement: Identifiable, Equatable, Sendable {
         let second = b - vertex
         let firstLength = first.length
         let secondLength = second.length
-        guard firstLength > FFMath.eps, secondLength > FFMath.eps else { return nil }
+        guard firstLength > FFTolerance.measurement,
+              secondLength > FFTolerance.measurement
+        else { return nil }
         let cosine = FFMath.clamp(
             first.dot(second) / (firstLength * secondLength),
             to: -1...1
@@ -162,7 +161,7 @@ struct FFMeasurement: Identifiable, Equatable, Sendable {
         let ac = c - a
         let bc = c - b
         let twiceArea = ab.cross(ac).length
-        guard twiceArea > FFMath.eps else { return nil }
+        guard twiceArea > FFTolerance.measurement else { return nil }
         let radius = ab.length * ac.length * bc.length / (2 * twiceArea)
         guard radius.isFinite, radius > 0 else { return nil }
         return radius

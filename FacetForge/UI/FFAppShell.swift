@@ -1606,7 +1606,7 @@ private struct FFInspector: View {
 
                 FFPanel(title: "Dimensions", subtitle: "Millimetres") {
                     FFField(label: "Band width", value: $bandWidth, unit: "mm")
-                    FFListRow(title: "Wall", trailing: "1.20 mm")
+                    FFListRow(title: "Wall", trailing: "1.200 mm")
 
                     HStack(spacing: FFSpace.xxs) {
                         ForEach(FFLengthUnit.allCases) { unit in
@@ -1622,13 +1622,16 @@ private struct FFInspector: View {
 
                     FFListRow(
                         title: "Converted",
-                        trailing: lengthUnit.formatted(millimetres: Double(bandWidth) ?? 18)
+                        trailing: FFPrecision.lengthString(
+                            millimetres: Double(bandWidth) ?? 18,
+                            unit: lengthUnit
+                        )
                     )
                     FFListRow(
                         title: "Ring size",
-                        trailing: String(
-                            format: "US %.1f",
-                            FFRingSize(innerDiameterMM: 18).usSize
+                        trailing: "US " + FFPrecision.fixed(
+                            FFRingSize(innerDiameterMM: 18).usSize,
+                            decimals: FFPrecision.usRingSizeDecimals
                         )
                     )
                 }

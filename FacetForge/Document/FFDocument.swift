@@ -225,7 +225,7 @@ struct FFCurvePayload: Codable, Equatable, Sendable {
         self.init(segments: path.curves.map { FFCurveSegment($0) }, isClosed: path.isClosed())
     }
 
-    func path(tolerance: Double = 1e-7) -> CurvePath2D? {
+    func path(tolerance: Double = FFTolerance.curveJoin) -> CurvePath2D? {
         let curves = segments.compactMap(\.curve)
         guard curves.count == segments.count, !curves.isEmpty else { return nil }
         return CurvePath2D.joining(curves, tolerance: tolerance)

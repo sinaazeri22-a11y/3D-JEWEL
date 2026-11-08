@@ -51,7 +51,7 @@ final class Phase19MeasurementTests: XCTestCase {
         let value = try XCTUnwrap(measurement.value)
         XCTAssertEqual(value, 5, accuracy: allowance)
         XCTAssertEqual(value, 5, accuracy: 1e-12)
-        XCTAssertEqual(measurement.displayText(.millimetres), "5.00 mm")
+        XCTAssertEqual(measurement.displayText(.millimetres), "5.000 mm")
     }
 
     func testAngleMatchesFixtureTruth() throws {
@@ -67,7 +67,7 @@ final class Phase19MeasurementTests: XCTestCase {
         let value = try XCTUnwrap(measurement.value)
         XCTAssertEqual(value, 9, accuracy: allowance)
         XCTAssertEqual(value, 9, accuracy: 1e-9)
-        XCTAssertEqual(measurement.displayText(.millimetres), "R 9.00 mm")
+        XCTAssertEqual(measurement.displayText(.millimetres), "R 9.000 mm")
     }
 
     func testDiameterMatchesFixtureTruth() throws {
@@ -75,7 +75,7 @@ final class Phase19MeasurementTests: XCTestCase {
         let value = try XCTUnwrap(measurement.value)
         XCTAssertEqual(value, 18, accuracy: allowance)
         XCTAssertEqual(value, 18, accuracy: 1e-9)
-        XCTAssertEqual(measurement.displayText(.millimetres), "Ø 18.00 mm")
+        XCTAssertEqual(measurement.displayText(.millimetres), "Ø 18.000 mm")
     }
 
     func testRingInnerDiameterMatchesFixtureTruthAndQuotesUSSize() throws {
@@ -83,7 +83,7 @@ final class Phase19MeasurementTests: XCTestCase {
         let value = try XCTUnwrap(measurement.value)
         XCTAssertEqual(value, 18, accuracy: allowance)
         XCTAssertEqual(value, 18, accuracy: 1e-9)
-        XCTAssertEqual(measurement.displayText(.millimetres), "Ø 18.00 mm · US 7.8")
+        XCTAssertEqual(measurement.displayText(.millimetres), "Ø 18.000 mm · US 7.8")
     }
 
     /// Two snapped points at the same place measure 0 mm: that is a real value,
@@ -98,7 +98,7 @@ final class Phase19MeasurementTests: XCTestCase {
             ]
         )
         XCTAssertEqual(try XCTUnwrap(coincident.value), 0, accuracy: allowance)
-        XCTAssertEqual(coincident.displayText(.millimetres), "0.00 mm")
+        XCTAssertEqual(coincident.displayText(.millimetres), "0.000 mm")
 
         let collinear = FFMeasurement(
             kind: .radius,
@@ -116,13 +116,13 @@ final class Phase19MeasurementTests: XCTestCase {
 
     func testLabelsFollowTheDisplayUnit() {
         let distance = FFMeasurement(kind: .distance, points: distanceFixture)
-        XCTAssertEqual(distance.displayText(.inches), "0.197 in")
+        XCTAssertEqual(distance.displayText(.inches), "0.19685 in")
 
         let radius = FFMeasurement(kind: .radius, points: circleFixture())
-        XCTAssertEqual(radius.displayText(.inches), "R 0.354 in")
+        XCTAssertEqual(radius.displayText(.inches), "R 0.35433 in")
 
         let ring = FFMeasurement(kind: .ringInnerDiameter, points: circleFixture())
-        XCTAssertEqual(ring.displayText(.inches), "Ø 0.709 in · US 7.8")
+        XCTAssertEqual(ring.displayText(.inches), "Ø 0.70866 in · US 7.8")
 
         // An angle is not a length, so the unit switch cannot change it.
         let angle = FFMeasurement(kind: .angle, points: angleFixture)
@@ -169,7 +169,7 @@ final class Phase19MeasurementTests: XCTestCase {
     func testLabelClampsAnOffscreenAnchorInsideTheViewport() throws {
         let viewport = Vec2(x: 320, y: 240)
         let layout = try XCTUnwrap(FFMeasurementLabelLayout.label(
-            text: "R 9.00 mm",
+            text: "R 9.000 mm",
             anchor: Vec2(x: -4_000, y: -3_000),
             viewport: viewport
         ))
@@ -181,7 +181,7 @@ final class Phase19MeasurementTests: XCTestCase {
 
     func testLabelIsRejectedByADegenerateViewport() {
         XCTAssertNil(FFMeasurementLabelLayout.label(
-            text: "R 9.00 mm",
+            text: "R 9.000 mm",
             anchor: .zero,
             viewport: .zero
         ))
@@ -273,7 +273,7 @@ final class Phase19MeasurementTests: XCTestCase {
         XCTAssertNotNil(session.add(FFSnapPoint(Vec3(x: 3, y: 4, z: 0), kind: .vertex)))
         XCTAssertEqual(session.draft.count, 0)
         XCTAssertEqual(session.measurements.count, 1)
-        XCTAssertEqual(session.latest?.displayText(.millimetres), "5.00 mm")
+        XCTAssertEqual(session.latest?.displayText(.millimetres), "5.000 mm")
         XCTAssertEqual(session.latest?.points.compactMap(\.snap), [.vertex, .vertex])
     }
 

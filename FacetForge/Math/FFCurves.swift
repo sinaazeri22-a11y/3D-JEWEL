@@ -660,7 +660,7 @@ enum Curve2D: Equatable, Sendable {
         )
     }
 
-    func joined(to other: Curve2D, tolerance: Double = 1e-7) -> CurvePath2D? {
+    func joined(to other: Curve2D, tolerance: Double = FFTolerance.curveJoin) -> CurvePath2D? {
         guard end.distance(to: other.start) <= tolerance else { return nil }
         return CurvePath2D(curves: [self, other])
     }
@@ -713,7 +713,7 @@ struct CurvePath2D: Equatable, Sendable {
         self.curves = curves
     }
 
-    static func joining(_ curves: [Curve2D], tolerance: Double = 1e-7) -> CurvePath2D? {
+    static func joining(_ curves: [Curve2D], tolerance: Double = FFTolerance.curveJoin) -> CurvePath2D? {
         guard let first = curves.first else { return nil }
         var previous = first
         for curve in curves.dropFirst() {
@@ -726,7 +726,7 @@ struct CurvePath2D: Equatable, Sendable {
     var start: Vec2 { curves[0].start }
     var end: Vec2 { curves[curves.count - 1].end }
 
-    func isClosed(tolerance: Double = 1e-7) -> Bool {
+    func isClosed(tolerance: Double = FFTolerance.curveJoin) -> Bool {
         start.distance(to: end) <= tolerance
     }
 

@@ -27,6 +27,7 @@
 		A10000000000000000000037 /* FFMetalViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000036 /* FFMetalViewport.swift */; };
 		A1000000000000000000003B /* FFCameraNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003A /* FFCameraNavigation.swift */; };
 		A1000000000000000000003E /* FFUnits.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003D /* FFUnits.swift */; };
+		A1000000000000000000008A /* FFPrecision.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000089 /* FFPrecision.swift */; };
 		A10000000000000000000046 /* FFDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* FFDocument.swift */; };
 		A10000000000000000000048 /* FFDocumentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* FFDocumentStore.swift */; };
 		A1000000000000000000004A /* FFSceneRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000049 /* FFSceneRendering.swift */; };
@@ -89,6 +90,7 @@
 		A20000000000000000000043 /* Phase27JournalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000042 /* Phase27JournalTests.swift */; };
 		A20000000000000000000047 /* Phase28LibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000048 /* Phase28LibraryTests.swift */; };
 		A20000000000000000000049 /* Phase29InterchangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000004A /* Phase29InterchangeTests.swift */; };
+		A2000000000000000000004C /* Phase30PrecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000004B /* Phase30PrecisionTests.swift */; };
 		A3000000000000000000001F /* LayerPanelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000001E /* LayerPanelUITests.swift */; };
 		A30000000000000000000021 /* PerformanceHUDUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000020 /* PerformanceHUDUITests.swift */; };
 		A30000000000000000000023 /* Phase23SmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000022 /* Phase23SmokeUITests.swift */; };
@@ -145,6 +147,7 @@
 		A10000000000000000000036 /* FFMetalViewport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFMetalViewport.swift; sourceTree = "<group>"; };
 		A1000000000000000000003A /* FFCameraNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFCameraNavigation.swift; sourceTree = "<group>"; };
 		A1000000000000000000003D /* FFUnits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFUnits.swift; sourceTree = "<group>"; };
+		A10000000000000000000089 /* FFPrecision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPrecision.swift; sourceTree = "<group>"; };
 		A10000000000000000000045 /* FFDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFDocument.swift; sourceTree = "<group>"; };
 		A10000000000000000000047 /* FFDocumentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFDocumentStore.swift; sourceTree = "<group>"; };
 		A10000000000000000000049 /* FFSceneRendering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFSceneRendering.swift; sourceTree = "<group>"; };
@@ -207,6 +210,7 @@
 		A20000000000000000000042 /* Phase27JournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase27JournalTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000048 /* Phase28LibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase28LibraryTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000004A /* Phase29InterchangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase29InterchangeTests.swift; sourceTree = "<group>"; };
+		A2000000000000000000004B /* Phase30PrecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase30PrecisionTests.swift; sourceTree = "<group>"; };
 		A3000000000000000000001E /* LayerPanelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerPanelUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000020 /* PerformanceHUDUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceHUDUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000022 /* Phase23SmokeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase23SmokeUITests.swift; sourceTree = "<group>"; };
@@ -363,6 +367,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000003D /* FFUnits.swift */,
+				A10000000000000000000089 /* FFPrecision.swift */,
 			);
 			path = Units;
 			sourceTree = "<group>";
@@ -427,6 +432,7 @@
 				A20000000000000000000042 /* Phase27JournalTests.swift */,
 				A20000000000000000000048 /* Phase28LibraryTests.swift */,
 				A2000000000000000000004A /* Phase29InterchangeTests.swift */,
+				A2000000000000000000004B /* Phase30PrecisionTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -601,6 +607,7 @@
 				A10000000000000000000037 /* FFMetalViewport.swift in Sources */,
 				A1000000000000000000003B /* FFCameraNavigation.swift in Sources */,
 				A1000000000000000000003E /* FFUnits.swift in Sources */,
+				A1000000000000000000008A /* FFPrecision.swift in Sources */,
 				A10000000000000000000046 /* FFDocument.swift in Sources */,
 				A10000000000000000000048 /* FFDocumentStore.swift in Sources */,
 				A1000000000000000000004A /* FFSceneRendering.swift in Sources */,
@@ -670,6 +677,7 @@
 				A20000000000000000000043 /* Phase27JournalTests.swift in Sources */,
 				A20000000000000000000047 /* Phase28LibraryTests.swift in Sources */,
 				A20000000000000000000049 /* Phase29InterchangeTests.swift in Sources */,
+				A2000000000000000000004C /* Phase30PrecisionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

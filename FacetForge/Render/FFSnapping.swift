@@ -297,7 +297,7 @@ enum FFSnapResolver {
                 guard let (p, q) = closestPoints(
                     first.segment.a, first.segment.b,
                     second.segment.a, second.segment.b
-                ), (p - q).length <= 1e-5 else { continue }
+                ), (p - q).length <= FFTolerance.snapping else { continue }
                 add(.intersection, (p + q) * 0.5)
             }
         }

@@ -41,9 +41,12 @@ enum FFLengthUnit: String, CaseIterable, Identifiable, Codable, Sendable {
 
     /// Formats a millimetre value in this unit. The suffix is part of the
     /// string so labels stay unambiguous when copied into notes.
-    func formatted(millimetres: Double, decimals: Int = 2) -> String {
+    /// A caller must name its decimals: the measurement policy lives in
+    /// `FFPrecision`, and a silent default here is how a view would invent its
+    /// own precision. Display values use `FFPrecision.lengthString` instead.
+    func formatted(millimetres: Double, decimals: Int) -> String {
         let value = value(fromMillimetres: millimetres)
-        return String(format: "%.\(max(0, decimals))f %@", value, label)
+        return FFPrecision.fixed(value, decimals: decimals) + " " + label
     }
 }
 

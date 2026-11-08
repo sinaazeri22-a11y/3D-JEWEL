@@ -44,12 +44,10 @@ struct FFGumballOverlay: View {
     }
 
     private var positionLabel: String {
-        String(
-            format: "X %.3f · Y %.3f · Z %.3f",
-            session.transform.m03,
-            session.transform.m13,
-            session.transform.m23
-        )
+        let places = FFPrecision.lengthDecimalsMM
+        return "X " + FFPrecision.fixed(session.transform.m03, decimals: places)
+            + " · Y " + FFPrecision.fixed(session.transform.m13, decimals: places)
+            + " · Z " + FFPrecision.fixed(session.transform.m23, decimals: places)
     }
 
     private var snapLabel: String {

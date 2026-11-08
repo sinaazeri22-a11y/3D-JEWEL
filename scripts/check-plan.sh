@@ -35,6 +35,7 @@ REQUIRED = [
     "docs/MASTER-PLAN.md",
     "docs/PROGRESS.md",
     "docs/branding.md",
+    "docs/precision.md",
     "docs/legal/provenance.md",
     "docs/adr/README.md",
     "docs/research/README.md",
