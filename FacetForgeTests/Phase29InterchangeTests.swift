@@ -259,6 +259,11 @@ final class Phase29InterchangeTests: XCTestCase {
 
         XCTAssertEqual(document.rootNodes.count, 3)
         XCTAssertEqual(
+            document.rootNodes.map(\.name),
+            ["ring", "stone", "accent"],
+            "a single-material group must keep the group name, not gain a material suffix"
+        )
+        XCTAssertEqual(
             document.rootNodes.first(where: { $0.name == "accent" })?.children.count,
             2
         )

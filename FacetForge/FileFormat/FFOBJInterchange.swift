@@ -745,19 +745,30 @@ enum FFOBJDocumentBuilder {
 
         var nodes: [FFNode] = []
         for group in asset.groups {
-            let children: [FFNode] = group.submeshes.map { submesh in
-                FFNode(
-                    name: submesh.material.map { "\(group.name) · \($0)" } ?? group.name,
+            guard !group.submeshes.isEmpty else { continue }
+            if group.submeshes.count == 1 {
+                // One material is still one object: keeping the group's name
+                // here is what lets an export write the same `g` again. A
+                // material suffix would turn `ring` into `ring · gold` and a
+                // round trip would no longer see the original groups.
+                let submesh = group.submeshes[0]
+                nodes.append(FFNode(
+                    name: group.name,
                     geometry: .mesh(FFMeshPayload(submesh.mesh)),
                     materialID: submesh.material.flatMap { materialIDByName[$0] },
                     kind: kind,
                     layerID: layerID
-                )
-            }
-            guard !children.isEmpty else { continue }
-            if children.count == 1 {
-                nodes.append(children[0])
+                ))
             } else {
+                let children: [FFNode] = group.submeshes.map { submesh in
+                    FFNode(
+                        name: submesh.material.map { "\(group.name) · \($0)" } ?? group.name,
+                        geometry: .mesh(FFMeshPayload(submesh.mesh)),
+                        materialID: submesh.material.flatMap { materialIDByName[$0] },
+                        kind: kind,
+                        layerID: layerID
+                    )
+                }
                 // A container keeps the group's name so the exporter still
                 // writes one group for several material submeshes.
                 nodes.append(FFNode(
