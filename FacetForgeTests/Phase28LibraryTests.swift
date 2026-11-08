@@ -248,6 +248,10 @@ final class Phase28LibraryTests: XCTestCase {
         XCTAssertTrue(hinted.absoluteString.hasSuffix("/"), "the fixture is not directory-hinted")
         XCTAssertEqual(scanned.url, open, "the scan's URL is a different identity than the saved file")
         XCTAssertEqual(FFDocumentLibrary.canonicalURL(hinted), open)
+        XCTAssertFalse(
+            FFDocumentLibrary.canonicalURL(hinted).absoluteString.hasSuffix("/"),
+            "the canonical identity still carries a directory hint"
+        )
 
         XCTAssertThrowsError(try session.deleteDocument(at: hinted)) { error in
             XCTAssertEqual(error as? FFLibraryError, .cannotModifyOpenDocument)

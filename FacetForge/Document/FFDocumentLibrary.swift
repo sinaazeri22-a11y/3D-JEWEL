@@ -85,7 +85,11 @@ struct FFDocumentLibrary {
     /// browser compares — selection, rename, duplicate, delete — must use one
     /// form. This is that form.
     static func canonicalURL(_ url: URL) -> URL {
-        URL(fileURLWithPath: url.path)
+        var path = url.path
+        while path.count > 1, path.hasSuffix("/") {
+            path.removeLast()
+        }
+        return URL(filePath: path, directoryHint: .notDirectory)
     }
 
     /// Whether two URLs name the same bundle, whichever of them came from a
