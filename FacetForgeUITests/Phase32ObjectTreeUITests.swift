@@ -35,6 +35,10 @@ final class Phase32ObjectTreeUITests: XCTestCase {
         let group = element("tree.row.Group 1", app)
         XCTAssertTrue(group.waitForExistence(timeout: 10), "the new group row did not appear")
         XCTAssertTrue(reveal(group, inspector: inspector), "the group row is not hittable")
+        XCTAssertTrue(
+            stone.isHittable,
+            "the drag source left the screen while revealing the group; a press would land off the row"
+        )
 
         drag(stone, to: group)
         XCTAssertTrue(
@@ -47,6 +51,7 @@ final class Phase32ObjectTreeUITests: XCTestCase {
         )
 
         XCTAssertTrue(reveal(shank, inspector: inspector), "the Shank row is not hittable")
+        XCTAssertTrue(group.isHittable, "the group row left the screen while revealing the source row")
         drag(shank, to: group)
         XCTAssertTrue(
             waitFor(timeout: 15, { ((shank.value as? String) ?? "").contains("level 2") }),
@@ -165,9 +170,10 @@ final class Phase32ObjectTreeUITests: XCTestCase {
         return element.exists && element.isHittable
     }
 
-    /// A slow drag that holds over the destination long enough for SwiftUI to
-    /// finish the drop session; the default release-immediately gesture lets a
-    /// scroll view claim the movement before the row is lifted.
+    /// A slow drag that holds over the destination. The panel's own drag session
+    /// resolves the drop on release, so the hold makes the aim unambiguous; the
+    /// default release-immediately gesture can let the scroll view claim the
+    /// movement before the row is lifted.
     @MainActor
     private func drag(_ source: XCUIElement, to destination: XCUIElement) {
         source.press(

@@ -5,6 +5,9 @@ import SwiftUI
 /// search text and the rename sheet's draft. A row drag nests into a group,
 /// and Up/Down reorder the selected node among its siblings.
 struct FFObjectTreePanel: View {
+    /// One coordinate space for the row frames and the drag locations.
+    static let dragSpace = "object-tree"
+
     let nodes: [FFNode]
     let selection: FFSelectionState
     let isLocked: (UUID) -> Bool
@@ -17,6 +20,13 @@ struct FFObjectTreePanel: View {
     @State private var query = ""
     @State private var renamingRow: FFObjectTreeRow?
     @FocusState private var isSearchFocused: Bool
+    /// The row being dragged and the group it is currently over. The drag is a
+    /// panel gesture rather than the system drag-and-drop session: a scroll view
+    /// and system drag arbitration can drop the lift, and the tree's rows live
+    /// in the inspector's scroll view.
+    @State private var draggingRowID: UUID?
+    @State private var dropTargetID: UUID?
+    @State private var rowFrames: [UUID: CGRect] = [:]
 
     private var rows: [FFObjectTreeRow] {
         FFObjectTree.rows(in: nodes, query: query, isLocked: isLocked)
@@ -59,12 +69,15 @@ struct FFObjectTreePanel: View {
                         treeRow(row)
                     }
                 }
+
             }
 
             Text("Drag a row onto a group to nest it. Up and Down reorder the selected row.")
                 .font(FFType.monoSmall)
                 .foregroundStyle(FFPalette.textTertiary.color)
         }
+        .coordinateSpace(name: FFObjectTreePanel.dragSpace)
+        .onPreferenceChange(FFTreeRowFrameKey.self) { rowFrames = $0 }
         .sheet(item: $renamingRow) { row in
             FFRenameNodeSheet(
                 initialName: row.name,
@@ -170,10 +183,11 @@ struct FFObjectTreePanel: View {
         let isSelected = selection.selectedIDs.contains(row.id)
         let value = rowValue(row, isSelected: isSelected)
 
-        // A Button's press gesture wins over the drag gesture, so a real drag
-        // never starts from a row and the nest command is unreachable. The row
-        // is a plain tappable view instead: a tap selects it, while a long press
-        // lifts it into the drag session the group's drop destination accepts.
+        // A Button's press gesture wins over a drag gesture, so the row is a
+        // plain tappable view: a tap selects it, while a long press followed by
+        // a move runs the panel's own drag session. The system drag-and-drop
+        // session was removed because the inspector's scroll view and the tap
+        // gesture could drop the lift, leaving the nest command unreachable.
         return HStack(spacing: FFSpace.xs) {
             Image(systemName: row.kind.systemImage)
                 .font(.system(size: 13, weight: .medium))
@@ -220,21 +234,69 @@ struct FFObjectTreePanel: View {
             in: RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
         )
         .contentShape(Rectangle())
+        .opacity(draggingRowID == row.id ? 0.55 : 1)
         .onTapGesture { onSelect(row.id) }
+        .overlay {
+            if dropTargetID == row.id {
+                RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
+                    .stroke(FFPalette.accent.color, lineWidth: 2)
+                    .accessibilityHidden(true)
+            }
+        }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: FFTreeRowFrameKey.self,
+                    value: [row.id: proxy.frame(in: .named(FFObjectTreePanel.dragSpace))]
+                )
+            }
+        )
+        .highPriorityGesture(dragGesture(for: row))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(row.name)
         .accessibilityValue(value)
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("tree.row.\(row.name)")
-        .draggable(row.id.uuidString)
-        .dropDestination(for: String.self) { items, _ in
-            guard row.isGroup,
-                  let raw = items.first,
-                  let id = UUID(uuidString: raw),
-                  id != row.id
-            else { return false }
-            return onNest(id, row.id)
-        }
+    }
+
+    /// A long press lifts the row, movement over another row aims the drop, and
+    /// the release either nests into a group or does nothing.
+    private func dragGesture(for row: FFObjectTreeRow) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.3)
+            .sequenced(
+                before: DragGesture(
+                    minimumDistance: 0,
+                    coordinateSpace: .named(FFObjectTreePanel.dragSpace)
+                )
+            )
+            .onChanged { value in
+                guard case .second(true, let drag?) = value else { return }
+                draggingRowID = row.id
+                let target = dropTarget(at: drag.location, excluding: row.id)
+                if target != dropTargetID { dropTargetID = target }
+            }
+            .onEnded { value in
+                defer {
+                    draggingRowID = nil
+                    dropTargetID = nil
+                }
+                guard case .second(true, let drag?) = value,
+                      let target = dropTarget(at: drag.location, excluding: row.id)
+                else { return }
+                _ = onNest(row.id, target)
+            }
+    }
+
+    /// The deepest group row whose frame contains the point. A stone or a
+    /// solid is never a destination, so a drop can only add a child to a group.
+    /// The highlight is the drag's only visual, which keeps one source of truth
+    /// for what a release will do.
+    private func dropTarget(at point: CGPoint, excluding source: UUID) -> UUID? {
+        rows
+            .filter { $0.isGroup && $0.id != source }
+            .filter { rowFrames[$0.id]?.contains(point) == true }
+            .max { $0.depth < $1.depth }?
+            .id
     }
 
     private func rowValue(_ row: FFObjectTreeRow, isSelected: Bool) -> String {
@@ -247,6 +309,15 @@ struct FFObjectTreePanel: View {
         if row.isLocked { parts.append("locked") }
         if isSelected { parts.append("selected") }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// Collects each row's frame in the panel's coordinate space so a drag can be
+/// resolved to the row under the finger without any row owning a drop target.
+private struct FFTreeRowFrameKey: PreferenceKey {
+    static var defaultValue: [UUID: CGRect] = [:]
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
     }
 }
 
