@@ -1,23 +1,17 @@
 import SwiftUI
 
-/// Phase 34's duplication and array surface. It offers the three creation
-/// commands and, when the selection is an array group, the parameters that
-/// remain editable after creation. Every intent routes to the editor session;
-/// the panel holds no document state and formats only what `FFArrayInfo`
-/// already computed.
+/// Phase 34's duplication and array commands. It offers the three creation
+/// commands; the live parameters of a selected array are rendered by
+/// `FFArrayParameterCard` in a fixed inset, so adding members to the tree can
+/// never push them off screen. The panel holds no document state and every
+/// intent routes to the editor session.
 struct FFArrayPanel: View {
     let canDuplicate: Bool
     let canArray: Bool
     let info: FFArrayInfo?
-    let lengthUnit: FFLengthUnit
     let onDuplicate: () -> Void
     let onLinear: () -> Void
     let onRadial: () -> Void
-    let onAdjustCount: (UUID, Int) -> Void
-    let onAdjustOffset: (UUID, Double) -> Void
-    let onSetDirection: (UUID, FFAxis) -> Void
-    let onSetAxis: (UUID, FFAxis) -> Void
-    let onAdjustAngle: (UUID, Double) -> Void
 
     var body: some View {
         FFPanel(
@@ -31,9 +25,7 @@ struct FFArrayPanel: View {
                 VStack(alignment: .leading, spacing: FFSpace.xxs) { creationChips }
             }
 
-            if let info {
-                parameterControls(info)
-            } else {
+            if info == nil {
                 Text("Select one object to duplicate or array.")
                     .font(FFType.caption)
                     .foregroundStyle(FFPalette.textTertiary.color)
@@ -77,89 +69,107 @@ struct FFArrayPanel: View {
         }
         .disabled(!canArray)
     }
+}
 
-    @ViewBuilder
-    private func parameterControls(_ info: FFArrayInfo) -> some View {
-        VStack(alignment: .leading, spacing: FFSpace.xs) {
-            Text(summary(info))
+/// The selected array's live parameters, pinned to the bottom of the inspector
+/// outside its scroll view. Every control routes to the session; the card
+/// formats only what `FFArrayInfo` already computed.
+struct FFArrayParameterCard: View {
+    let info: FFArrayInfo
+    let lengthUnit: FFLengthUnit
+    let onAdjustCount: (UUID, Int) -> Void
+    let onAdjustOffset: (UUID, Double) -> Void
+    let onSetDirection: (UUID, FFAxis) -> Void
+    let onSetAxis: (UUID, FFAxis) -> Void
+    let onAdjustAngle: (UUID, Double) -> Void
+
+    var body: some View {
+        FFPanel(
+            title: "Array parameters",
+            subtitle: "\(info.name) · \(info.parameters.kind.label)",
+            trailing: info.isLocked ? "locked" : nil
+        ) {
+            VStack(alignment: .leading, spacing: FFSpace.xs) {
+                Text(summary(info))
+                    .font(FFType.monoSmall)
+                    .foregroundStyle(FFPalette.textAccent.color)
+                    .accessibilityIdentifier("array.summary")
+
+                stepperRow(
+                    title: "Count",
+                    value: "\(info.parameters.count)",
+                    valueIdentifier: "array.count.value",
+                    decreaseIdentifier: "array.count.decrease",
+                    increaseIdentifier: "array.count.increase",
+                    isEnabled: !info.isLocked,
+                    onDecrease: { onAdjustCount(info.nodeID, -1) },
+                    onIncrease: { onAdjustCount(info.nodeID, 1) }
+                )
+
+                switch info.parameters.kind {
+                case .linear:
+                    stepperRow(
+                        title: "Offset",
+                        value: FFPrecision.lengthString(
+                            millimetres: info.parameters.offset,
+                            unit: lengthUnit
+                        ),
+                        valueIdentifier: "array.offset.value",
+                        decreaseIdentifier: "array.offset.decrease",
+                        increaseIdentifier: "array.offset.increase",
+                        isEnabled: !info.isLocked,
+                        onDecrease: {
+                            onAdjustOffset(info.nodeID, -FFArrayParameters.offsetStep)
+                        },
+                        onIncrease: {
+                            onAdjustOffset(info.nodeID, FFArrayParameters.offsetStep)
+                        }
+                    )
+
+                    axisChips(
+                        title: "Direction",
+                        prefix: "array.direction",
+                        selected: info.parameters.direction,
+                        isEnabled: !info.isLocked
+                    ) { axis in
+                        onSetDirection(info.nodeID, axis)
+                    }
+
+                case .radial:
+                    stepperRow(
+                        title: "Total angle",
+                        value: FFPrecision.angleString(degrees: info.parameters.totalAngle),
+                        valueIdentifier: "array.angle.value",
+                        decreaseIdentifier: "array.angle.decrease",
+                        increaseIdentifier: "array.angle.increase",
+                        isEnabled: !info.isLocked,
+                        onDecrease: {
+                            onAdjustAngle(info.nodeID, -FFArrayParameters.angleStep)
+                        },
+                        onIncrease: {
+                            onAdjustAngle(info.nodeID, FFArrayParameters.angleStep)
+                        }
+                    )
+
+                    axisChips(
+                        title: "Axis",
+                        prefix: "array.axis",
+                        selected: info.parameters.axis,
+                        isEnabled: !info.isLocked
+                    ) { axis in
+                        onSetAxis(info.nodeID, axis)
+                    }
+                }
+
+                Text(
+                    info.isLocked
+                        ? "This array's layer is locked."
+                        : "Editing rebuilds the copies; each change is one undo step."
+                )
                 .font(FFType.monoSmall)
-                .foregroundStyle(FFPalette.textAccent.color)
-                .accessibilityIdentifier("array.summary")
-
-            stepperRow(
-                title: "Count",
-                value: "\(info.parameters.count)",
-                valueIdentifier: "array.count.value",
-                decreaseIdentifier: "array.count.decrease",
-                increaseIdentifier: "array.count.increase",
-                isEnabled: !info.isLocked,
-                onDecrease: { onAdjustCount(info.nodeID, -1) },
-                onIncrease: { onAdjustCount(info.nodeID, 1) }
-            )
-
-            switch info.parameters.kind {
-            case .linear:
-                stepperRow(
-                    title: "Offset",
-                    value: FFPrecision.lengthString(
-                        millimetres: info.parameters.offset,
-                        unit: lengthUnit
-                    ),
-                    valueIdentifier: "array.offset.value",
-                    decreaseIdentifier: "array.offset.decrease",
-                    increaseIdentifier: "array.offset.increase",
-                    isEnabled: !info.isLocked,
-                    onDecrease: {
-                        onAdjustOffset(info.nodeID, -FFArrayParameters.offsetStep)
-                    },
-                    onIncrease: {
-                        onAdjustOffset(info.nodeID, FFArrayParameters.offsetStep)
-                    }
-                )
-
-                axisChips(
-                    title: "Direction",
-                    prefix: "array.direction",
-                    selected: info.parameters.direction,
-                    isEnabled: !info.isLocked
-                ) { axis in
-                    onSetDirection(info.nodeID, axis)
-                }
-
-            case .radial:
-                stepperRow(
-                    title: "Total angle",
-                    value: FFPrecision.angleString(degrees: info.parameters.totalAngle),
-                    valueIdentifier: "array.angle.value",
-                    decreaseIdentifier: "array.angle.decrease",
-                    increaseIdentifier: "array.angle.increase",
-                    isEnabled: !info.isLocked,
-                    onDecrease: {
-                        onAdjustAngle(info.nodeID, -FFArrayParameters.angleStep)
-                    },
-                    onIncrease: {
-                        onAdjustAngle(info.nodeID, FFArrayParameters.angleStep)
-                    }
-                )
-
-                axisChips(
-                    title: "Axis",
-                    prefix: "array.axis",
-                    selected: info.parameters.axis,
-                    isEnabled: !info.isLocked
-                ) { axis in
-                    onSetAxis(info.nodeID, axis)
-                }
+                .foregroundStyle(FFPalette.textTertiary.color)
+                .accessibilityIdentifier(info.isLocked ? "array.locked" : "array.note")
             }
-
-            Text(
-                info.isLocked
-                    ? "This array's layer is locked."
-                    : "Editing rebuilds the copies; each change is one undo step."
-            )
-            .font(FFType.monoSmall)
-            .foregroundStyle(FFPalette.textTertiary.color)
-            .accessibilityIdentifier(info.isLocked ? "array.locked" : "array.note")
         }
     }
 
@@ -285,7 +295,7 @@ struct FFArrayPanel: View {
     // MARK: - Formatting
 
     /// One line names the kind, member count and the value that defines the
-    /// spacing, so the panel never shows a number the array does not use (the
+    /// spacing, so the card never shows a number the array does not use (the
     /// offset is absent from a radial array and the sweep from a linear one).
     private func summary(_ info: FFArrayInfo) -> String {
         let parameters = info.parameters

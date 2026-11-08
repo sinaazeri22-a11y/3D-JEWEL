@@ -1550,30 +1550,10 @@ private struct FFInspector: View {
                     }
                 }
 
-                // Phase 34's duplicate and array surface. It sits above the
-                // tree because its commands act on the tree's selection, and
-                // the parameter editor must not move when an array adds its
-                // members to the tree below. Every intent routes to the
-                // session.
-                FFArrayPanel(
-                    canDuplicate: canDuplicateSelection,
-                    canArray: canArraySelection,
-                    info: arrayInfo,
-                    lengthUnit: lengthUnit,
-                    onDuplicate: onDuplicate,
-                    onLinear: onLinearArray,
-                    onRadial: onRadialArray,
-                    onAdjustCount: onAdjustArrayCount,
-                    onAdjustOffset: onAdjustArrayOffset,
-                    onSetDirection: onSetArrayDirection,
-                    onSetAxis: onSetArrayAxis,
-                    onAdjustAngle: onAdjustArrayAngle
-                )
-
-                // Phase 32's object tree. It sits under the array commands so
-                // the two selection-driven surfaces are adjacent; every command
-                // routes to the session and the panel owns only search and the
-                // rename sheet's draft.
+                // Phase 32's object tree. It sits directly under Layers so the
+                // two document structures are adjacent; every command routes
+                // to the session and the panel owns only search and the rename
+                // sheet's draft.
                 FFObjectTreePanel(
                     nodes: nodes,
                     selection: selection,
@@ -1806,6 +1786,40 @@ private struct FFInspector: View {
                 .padding(.bottom, FFSpace.sm)
             }
             .padding(FFSpace.sm)
+        }
+        // Phase 34's commands and the selected array's live parameters stay
+        // pinned here while the tree above scrolls through the array's members.
+        // The creation row never moves: a new array cannot push its own controls
+        // away, and the parameter card grows above it, not through it. Neither
+        // view owns state; every control routes to the session.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                if let arrayInfo {
+                    FFArrayParameterCard(
+                        info: arrayInfo,
+                        lengthUnit: lengthUnit,
+                        onAdjustCount: onAdjustArrayCount,
+                        onAdjustOffset: onAdjustArrayOffset,
+                        onSetDirection: onSetArrayDirection,
+                        onSetAxis: onSetArrayAxis,
+                        onAdjustAngle: onAdjustArrayAngle
+                    )
+                    .padding(.bottom, FFSpace.xxs)
+                }
+
+                FFArrayPanel(
+                    canDuplicate: canDuplicateSelection,
+                    canArray: canArraySelection,
+                    info: arrayInfo,
+                    onDuplicate: onDuplicate,
+                    onLinear: onLinearArray,
+                    onRadial: onRadialArray
+                )
+            }
+            .padding(.horizontal, FFSpace.sm)
+            .padding(.top, FFSpace.xxs)
+            .padding(.bottom, FFSpace.sm)
+            .background(FFPalette.panel.color)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(FFPalette.panel.color)
