@@ -206,15 +206,15 @@ extension FFDocument {
     /// move, so a caller that moved a node within its own siblings can pass the
     /// final index directly.
     @discardableResult
-    mutating func insertNode(_ node: FFNode, into parentID: UUID?, at index: Int) -> Bool {
+    mutating func insertNode(_ subtree: FFNode, into parentID: UUID?, at index: Int) -> Bool {
         if let parentID {
-            guard node(withID: parentID) != nil else { return false }
-            let insertion = min(max(0, index), node(withID: parentID)?.children.count ?? 0)
-            return updateNode(withID: parentID) { parent in
-                parent.children.insert(node, at: insertion)
+            guard let parent = node(withID: parentID) else { return false }
+            let insertion = min(max(0, index), parent.children.count)
+            return updateNode(withID: parentID) { changed in
+                changed.children.insert(subtree, at: insertion)
             }
         }
-        rootNodes.insert(node, at: min(max(0, index), rootNodes.count))
+        rootNodes.insert(subtree, at: min(max(0, index), rootNodes.count))
         return true
     }
 
