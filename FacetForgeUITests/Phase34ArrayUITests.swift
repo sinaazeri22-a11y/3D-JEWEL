@@ -4,7 +4,8 @@ import XCTest
 /// in the panel's default twelve-member radial array; the summary must report a
 /// 30° step, the count must rebuild eleven and then twelve concrete members, and
 /// duplicating the array group must copy its parameters as one undo step. The
-/// panel sits above the tree, so adding members cannot push its controls away.
+/// creation row and parameter card are pinned below the tree, so adding members
+/// cannot push the controls away.
 final class Phase34ArrayUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -21,8 +22,8 @@ final class Phase34ArrayUITests: XCTestCase {
         let app = launch()
 
         // The fixture launches with the stone selected, which is what both the
-        // array commands act on. The row itself may be below the fold because
-        // the array panel is above the tree; its value is still asserted.
+        // array commands act on. The row itself may be below the fold while the
+        // controls are pinned; its value is still asserted.
         let stone = element("tree.row.Stone", app)
         XCTAssertTrue(stone.waitForExistence(timeout: 15), "the Stone row is missing")
         XCTAssertTrue(
