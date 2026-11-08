@@ -1550,29 +1550,11 @@ private struct FFInspector: View {
                     }
                 }
 
-                // Phase 32's object tree. It sits directly under Layers so the
-                // two document structures are adjacent; every command routes
-                // to the session and the panel owns only search and the rename
-                // sheet's draft.
-                FFObjectTreePanel(
-                    nodes: nodes,
-                    selection: selection,
-                    isLocked: isNodeLocked,
-                    onSelect: onSelectNode,
-                    onRename: onRenameNode,
-                    onAddGroup: onAddGroup,
-                    onGroupSelection: onGroupSelection,
-                    onUngroupSelection: onUngroupSelection,
-                    canGroupSelection: canGroupSelection,
-                    canUngroupSelection: canUngroupSelection,
-                    onNest: onNestNode,
-                    onMove: onMoveNode
-                )
-
-                // Phase 34's duplicate and array surface. It sits beside the
-                // tree because the commands act on the selected row, and its
-                // parameter editor appears only for an array group. Every
-                // intent routes to the session.
+                // Phase 34's duplicate and array surface. It sits above the
+                // tree because its commands act on the tree's selection, and
+                // the parameter editor must not move when an array adds its
+                // members to the tree below. Every intent routes to the
+                // session.
                 FFArrayPanel(
                     canDuplicate: canDuplicateSelection,
                     canArray: canArraySelection,
@@ -1586,6 +1568,25 @@ private struct FFInspector: View {
                     onSetDirection: onSetArrayDirection,
                     onSetAxis: onSetArrayAxis,
                     onAdjustAngle: onAdjustArrayAngle
+                )
+
+                // Phase 32's object tree. It sits under the array commands so
+                // the two selection-driven surfaces are adjacent; every command
+                // routes to the session and the panel owns only search and the
+                // rename sheet's draft.
+                FFObjectTreePanel(
+                    nodes: nodes,
+                    selection: selection,
+                    isLocked: isNodeLocked,
+                    onSelect: onSelectNode,
+                    onRename: onRenameNode,
+                    onAddGroup: onAddGroup,
+                    onGroupSelection: onGroupSelection,
+                    onUngroupSelection: onUngroupSelection,
+                    canGroupSelection: canGroupSelection,
+                    canUngroupSelection: canUngroupSelection,
+                    onNest: onNestNode,
+                    onMove: onMoveNode
                 )
 
                 // Phase 33's pivot and inheritance surface. It sits under the

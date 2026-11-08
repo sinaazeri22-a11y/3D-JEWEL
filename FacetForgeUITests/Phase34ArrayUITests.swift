@@ -1,9 +1,10 @@
 import XCTest
 
-/// Phase 34's acceptance in the shipping hierarchy. The stone is duplicated
-/// from the panel, the copy is selected and removed with one undo, and a radial
-/// array is created with twelve members whose count is then edited to eleven
-/// and back, proving the parameters stay live after creation.
+/// Phase 34's acceptance in the shipping hierarchy. The launch stone is wrapped
+/// in the panel's default twelve-member radial array; the summary must report a
+/// 30° step, the count must rebuild eleven and then twelve concrete members, and
+/// duplicating the array group must copy its parameters as one undo step. The
+/// panel sits above the tree, so adding members cannot push its controls away.
 final class Phase34ArrayUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -18,49 +19,21 @@ final class Phase34ArrayUITests: XCTestCase {
     @MainActor
     func testDuplicateAndRadialArrayEditThroughThePanel() throws {
         let app = launch()
-        let inspector = element("shell.inspector", app)
-        let stone = element("tree.row.Stone", app)
 
-        XCTAssertTrue(reveal(stone, inspector: inspector), "the Stone row is missing")
+        // The fixture launches with the stone selected, which is what both the
+        // array commands act on. The row itself may be below the fold because
+        // the array panel is above the tree; its value is still asserted.
+        let stone = element("tree.row.Stone", app)
+        XCTAssertTrue(stone.waitForExistence(timeout: 15), "the Stone row is missing")
         XCTAssertTrue(
             (stone.value as? String)?.contains("selected") == true,
             "the launch selection is not the stone; value='\(stone.value ?? "")'"
         )
 
-        // Duplicate: the copy appears beside the stone, becomes the selection
-        // and is removed by one undo.
-        let duplicate = element("array.duplicate", app)
-        XCTAssertTrue(reveal(duplicate, inspector: inspector), "the duplicate command is missing")
-        XCTAssertTrue(duplicate.isEnabled, "a selected unlocked stone should be duplicateable")
-        duplicate.tap()
-
-        let copy = element("tree.row.Stone copy", app)
-        XCTAssertTrue(copy.waitForExistence(timeout: 15), "the duplicated row did not appear")
-        XCTAssertTrue(
-            waitFor(timeout: 10, { ((copy.value as? String) ?? "").contains("selected") }),
-            "the duplicate did not become the selection; value='\(copy.value ?? "")'"
-        )
-        XCTAssertTrue(
-            ((copy.value as? String) ?? "").contains("level 1"),
-            "the copy should sit beside the stone; value='\(copy.value ?? "")'"
-        )
-
-        let undo = element("shell.document.undo", app)
-        XCTAssertTrue(undo.isHittable, "the undo control is missing")
-        undo.tap()
-        XCTAssertTrue(waitFor(timeout: 15, { !copy.exists }), "undo did not remove the duplicate")
-
-        // Radial array: select the stone again and use the panel's default
-        // twelve-member full circle.
-        XCTAssertTrue(reveal(stone, inspector: inspector), "the Stone row is not reachable")
-        stone.tap()
-        XCTAssertTrue(
-            waitFor(timeout: 10, { ((stone.value as? String) ?? "").contains("selected") }),
-            "the stone could not be selected again"
-        )
-
+        // A radial array with the panel's default twelve members over 360°.
         let radial = element("array.radial", app)
-        XCTAssertTrue(reveal(radial, inspector: inspector), "the radial command is missing")
+        XCTAssertTrue(radial.waitForExistence(timeout: 10), "the radial command is missing")
+        assertOnScreen(radial, "the radial command is not on screen", app: app)
         XCTAssertTrue(radial.isEnabled, "a selected unlocked stone should be arrayable")
         radial.tap()
 
@@ -75,10 +48,12 @@ final class Phase34ArrayUITests: XCTestCase {
             "the new array did not become the selection; value='\(array.value ?? "")'"
         )
 
-        // Editing after creation: one decrement must rebuild eleven concrete
-        // members, not merely update a readout.
+        // The row's criterion: twelve members over 360° are exactly 30° apart,
+        // and the parameters stay live after creation. A readout needs to be
+        // present and correct, not tappable; the edits below are the controls
+        // that must be reachable.
         let summary = element("array.summary", app)
-        XCTAssertTrue(reveal(summary, inspector: inspector), "the array parameters are missing")
+        XCTAssertTrue(summary.waitForExistence(timeout: 10), "the array parameters are missing")
         XCTAssertTrue(
             waitFor(timeout: 10, { summary.label.contains("12 items") }),
             "the array summary does not report twelve items; label='\(summary.label)'"
@@ -88,8 +63,10 @@ final class Phase34ArrayUITests: XCTestCase {
             "a twelve-member full circle should report 30° spacing; label='\(summary.label)'"
         )
 
+        // One decrement must rebuild eleven concrete members, not merely update
+        // a readout.
         let decrease = element("array.count.decrease", app)
-        XCTAssertTrue(reveal(decrease, inspector: inspector), "the count control is missing")
+        assertOnScreen(decrease, "the count control is not on screen", app: app)
         decrease.tap()
         XCTAssertTrue(
             waitFor(timeout: 15, {
@@ -103,7 +80,7 @@ final class Phase34ArrayUITests: XCTestCase {
         )
 
         let increase = element("array.count.increase", app)
-        XCTAssertTrue(reveal(increase, inspector: inspector), "the count restore control is missing")
+        assertOnScreen(increase, "the count restore control is not on screen", app: app)
         increase.tap()
         XCTAssertTrue(
             waitFor(timeout: 15, {
@@ -112,11 +89,34 @@ final class Phase34ArrayUITests: XCTestCase {
             "restoring the count did not rebuild twelve members; value='\(array.value ?? "")'"
         )
 
-        XCTAssertTrue(reveal(array, inspector: inspector), "the array row is not reachable")
-        array.tap()
+        // An array is a group like any other: duplicating the selected group
+        // copies its parameters and every member, and one undo removes it.
+        let duplicate = element("array.duplicate", app)
+        assertOnScreen(duplicate, "the duplicate command is not on screen", app: app)
+        XCTAssertTrue(duplicate.isEnabled, "the selected unlocked array should be duplicateable")
+        duplicate.tap()
+
+        let copy = element("tree.row.Stone Array copy", app)
+        XCTAssertTrue(copy.waitForExistence(timeout: 15), "the duplicated array did not appear")
         XCTAssertTrue(
-            waitFor(timeout: 10, { ((array.value as? String) ?? "").contains("selected") }),
-            "the array row could not be reselected"
+            waitFor(timeout: 10, { ((copy.value as? String) ?? "").contains("selected") }),
+            "the duplicate did not become the selection; value='\(copy.value ?? "")'"
+        )
+        XCTAssertTrue(
+            ((copy.value as? String) ?? "").contains("12 children"),
+            "the duplicated array did not copy its members; value='\(copy.value ?? "")'"
+        )
+        XCTAssertTrue(
+            ((copy.value as? String) ?? "").contains("level 1"),
+            "the copy should sit beside the array; value='\(copy.value ?? "")'"
+        )
+
+        let undo = element("shell.document.undo", app)
+        assertOnScreen(undo, "the undo control is missing", app: app)
+        undo.tap()
+        XCTAssertTrue(
+            waitFor(timeout: 15, { !copy.exists }),
+            "one undo did not remove the duplicated array"
         )
 
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -138,58 +138,24 @@ final class Phase34ArrayUITests: XCTestCase {
         return app
     }
 
+    /// A control this test must press has to be on screen. Record the state
+    /// before failing so a red run explains itself without another iteration.
     @MainActor
-    private func reveal(_ element: XCUIElement, inspector: XCUIElement) -> Bool {
-        if isHittable(element) { return true }
-        for _ in 0..<10 {
-            scroll(inspector, up: true)
-            if isHittable(element) { return true }
-        }
-        for _ in 0..<16 {
-            scroll(inspector, up: false)
-            if isHittable(element) { return true }
-        }
-        let found = isHittable(element)
-        if !found {
-            // A failing reveal is expensive to diagnose from the run log alone,
-            // so record the hierarchy and the screen the runner actually saw.
-            let hierarchy = XCTAttachment(string: inspector.debugDescription)
-            hierarchy.name = "phase34-inspector-hierarchy"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            shot.name = "phase34-reveal-failure"
-            shot.lifetime = .keepAlways
-            add(shot)
-        }
-        return found
-    }
-
-    /// Scrolls from the inspector's outer gutter instead of its centre. The
-    /// object tree's rows own a high-priority long-press-drag, and a synthesized
-    /// swipe in the middle of the scroll view lands on a row, where the scroll
-    /// never starts; the gutter is the scroll view itself. This moves the view
-    /// only and leaves every assertion about what it finds unchanged.
-    @MainActor
-    private func scroll(_ inspector: XCUIElement, up: Bool) {
-        let x = 0.03
-        let start = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: x, dy: up ? 0.85 : 0.15)
-        )
-        let end = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: x, dy: up ? 0.15 : 0.85)
-        )
-        start.press(forDuration: 0.05, thenDragTo: end)
-        settle()
-    }
-
-    @MainActor
-    private func isHittable(_ element: XCUIElement) -> Bool {
-        element.exists && element.isHittable
-    }
-
-    private func settle() {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+    private func assertOnScreen(
+        _ element: XCUIElement,
+        _ message: String,
+        app: XCUIApplication
+    ) {
+        if element.exists && element.isHittable { return }
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "phase34-failure-hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "phase34-failure-screen"
+        shot.lifetime = .keepAlways
+        add(shot)
+        XCTFail("\(message); exists=\(element.exists) hittable=\(element.isHittable)")
     }
 
     @MainActor
