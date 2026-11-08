@@ -142,16 +142,45 @@ final class Phase34ArrayUITests: XCTestCase {
     private func reveal(_ element: XCUIElement, inspector: XCUIElement) -> Bool {
         if isHittable(element) { return true }
         for _ in 0..<10 {
-            inspector.swipeUp()
-            settle()
+            scroll(inspector, up: true)
             if isHittable(element) { return true }
         }
         for _ in 0..<16 {
-            inspector.swipeDown()
-            settle()
+            scroll(inspector, up: false)
             if isHittable(element) { return true }
         }
-        return isHittable(element)
+        let found = isHittable(element)
+        if !found {
+            // A failing reveal is expensive to diagnose from the run log alone,
+            // so record the hierarchy and the screen the runner actually saw.
+            let hierarchy = XCTAttachment(string: inspector.debugDescription)
+            hierarchy.name = "phase34-inspector-hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "phase34-reveal-failure"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        return found
+    }
+
+    /// Scrolls from the inspector's outer gutter instead of its centre. The
+    /// object tree's rows own a high-priority long-press-drag, and a synthesized
+    /// swipe in the middle of the scroll view lands on a row, where the scroll
+    /// never starts; the gutter is the scroll view itself. This moves the view
+    /// only and leaves every assertion about what it finds unchanged.
+    @MainActor
+    private func scroll(_ inspector: XCUIElement, up: Bool) {
+        let x = 0.03
+        let start = inspector.coordinate(
+            withNormalizedOffset: CGVector(dx: x, dy: up ? 0.85 : 0.15)
+        )
+        let end = inspector.coordinate(
+            withNormalizedOffset: CGVector(dx: x, dy: up ? 0.15 : 0.85)
+        )
+        start.press(forDuration: 0.05, thenDragTo: end)
+        settle()
     }
 
     @MainActor
