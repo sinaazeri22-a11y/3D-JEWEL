@@ -165,9 +165,17 @@ final class Phase32ObjectTreeUITests: XCTestCase {
         return element.exists && element.isHittable
     }
 
+    /// A slow drag that holds over the destination long enough for SwiftUI to
+    /// finish the drop session; the default release-immediately gesture lets a
+    /// scroll view claim the movement before the row is lifted.
     @MainActor
     private func drag(_ source: XCUIElement, to destination: XCUIElement) {
-        source.press(forDuration: 1.0, thenDragTo: destination)
+        source.press(
+            forDuration: 1.0,
+            thenDragTo: destination,
+            withVelocity: .slow,
+            thenHoldForDuration: 0.8
+        )
     }
 
     @MainActor

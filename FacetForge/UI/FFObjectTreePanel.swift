@@ -170,60 +170,62 @@ struct FFObjectTreePanel: View {
         let isSelected = selection.selectedIDs.contains(row.id)
         let value = rowValue(row, isSelected: isSelected)
 
-        return Button {
-            onSelect(row.id)
-        } label: {
-            HStack(spacing: FFSpace.xs) {
-                Image(systemName: row.kind.systemImage)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(
-                        isSelected ? FFPalette.textAccent.color : FFPalette.textSecondary.color
-                    )
-                    .frame(width: 20)
+        // A Button's press gesture wins over the drag gesture, so a real drag
+        // never starts from a row and the nest command is unreachable. The row
+        // is a plain tappable view instead: a tap selects it, while a long press
+        // lifts it into the drag session the group's drop destination accepts.
+        return HStack(spacing: FFSpace.xs) {
+            Image(systemName: row.kind.systemImage)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(
+                    isSelected ? FFPalette.textAccent.color : FFPalette.textSecondary.color
+                )
+                .frame(width: 20)
+                .accessibilityHidden(true)
+
+            Text(row.name)
+                .font(FFType.caption)
+                .foregroundStyle(
+                    row.isLocked ? FFPalette.textTertiary.color : FFPalette.textPrimary.color
+                )
+                .lineLimit(1)
+
+            Spacer(minLength: FFSpace.xxs)
+
+            if row.isLocked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(FFPalette.textTertiary.color)
                     .accessibilityHidden(true)
-
-                Text(row.name)
-                    .font(FFType.caption)
-                    .foregroundStyle(
-                        row.isLocked ? FFPalette.textTertiary.color : FFPalette.textPrimary.color
-                    )
-                    .lineLimit(1)
-
-                Spacer(minLength: FFSpace.xxs)
-
-                if row.isLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(FFPalette.textTertiary.color)
-                        .accessibilityHidden(true)
-                }
-
-                if row.childCount > 0 {
-                    Text("\(row.childCount)")
-                        .font(FFType.monoSmall)
-                        .foregroundStyle(FFPalette.textTertiary.color)
-                }
-
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(FFPalette.textAccent.color)
-                        .accessibilityHidden(true)
-                }
             }
-            .padding(.leading, FFSpace.xxs + CGFloat(row.depth) * 14)
-            .padding(.trailing, FFSpace.xxs)
-            .frame(maxWidth: .infinity, minHeight: FFHitTarget.minimum, alignment: .leading)
-            .background(
-                isSelected ? FFPalette.raised.color : Color.clear,
-                in: RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
-            )
-            .contentShape(Rectangle())
+
+            if row.childCount > 0 {
+                Text("\(row.childCount)")
+                    .font(FFType.monoSmall)
+                    .foregroundStyle(FFPalette.textTertiary.color)
+            }
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(FFPalette.textAccent.color)
+                    .accessibilityHidden(true)
+            }
         }
-        .buttonStyle(FFPressStyle())
-        .accessibilityIdentifier("tree.row.\(row.name)")
+        .padding(.leading, FFSpace.xxs + CGFloat(row.depth) * 14)
+        .padding(.trailing, FFSpace.xxs)
+        .frame(maxWidth: .infinity, minHeight: FFHitTarget.minimum, alignment: .leading)
+        .background(
+            isSelected ? FFPalette.raised.color : Color.clear,
+            in: RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { onSelect(row.id) }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(row.name)
         .accessibilityValue(value)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("tree.row.\(row.name)")
         .draggable(row.id.uuidString)
         .dropDestination(for: String.self) { items, _ in
             guard row.isGroup,
