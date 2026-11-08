@@ -65,6 +65,10 @@ final class Phase32ObjectTreeUITests: XCTestCase {
         // Children are now [Stone, Shank]. Select Shank and move it up; the
         // rendered order must flip, not merely the selection.
         shank.tap()
+        XCTAssertTrue(
+            waitFor(timeout: 10, { ((shank.value as? String) ?? "").contains("selected") }),
+            "tapping the Shank row did not select it, so Up would act on the wrong row"
+        )
         let moveUp = element("tree.moveUp", app)
         XCTAssertTrue(reveal(moveUp, inspector: inspector), "the reorder control is missing")
         XCTAssertTrue(shank.frame.minY > stone.frame.minY, "the setup order is not Stone, Shank")
@@ -123,7 +127,19 @@ final class Phase32ObjectTreeUITests: XCTestCase {
             "clearing the type search did not restore the stone"
         )
 
+        // Prove a tap selects a row the launch sample did not select, then
+        // return to the stone so the rename's expected name is unambiguous.
+        shank.tap()
+        XCTAssertTrue(
+            waitFor(timeout: 10, { ((shank.value as? String) ?? "").contains("selected") }),
+            "tapping the Shank row did not move the selection"
+        )
         stone.tap()
+        XCTAssertTrue(
+            waitFor(timeout: 10, { ((stone.value as? String) ?? "").contains("selected") }),
+            "tapping the Stone row did not move the selection back"
+        )
+
         let rename = element("tree.rename", app)
         XCTAssertTrue(reveal(rename, inspector: inspector), "the rename control is missing")
         rename.tap()

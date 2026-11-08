@@ -235,7 +235,11 @@ struct FFObjectTreePanel: View {
         )
         .contentShape(Rectangle())
         .opacity(draggingRowID == row.id ? 0.55 : 1)
-        .onTapGesture { onSelect(row.id) }
+        // The tap is simultaneous, not lower priority: a high-priority drag
+        // gesture cancels a competing tap, and the row would stop selecting
+        // after the first drag. A tap still fails once the finger moves, so a
+        // drag never selects on release.
+        .simultaneousGesture(TapGesture().onEnded { onSelect(row.id) })
         .overlay {
             if dropTargetID == row.id {
                 RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
