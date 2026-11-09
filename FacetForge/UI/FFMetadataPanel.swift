@@ -91,14 +91,12 @@ struct FFMetadataInspectorSheet: View {
             field(
                 .partNumber,
                 text: $partNumber,
-                prompt: "FF-0000",
-                onChange: { partNumber = $0 }
+                prompt: "FF-0000"
             )
             field(
                 .sku,
                 text: $sku,
-                prompt: "SKU",
-                onChange: { sku = $0 }
+                prompt: "SKU"
             )
         }
     }
@@ -114,15 +112,13 @@ struct FFMetadataInspectorSheet: View {
                 .itemDescription,
                 text: $itemDescription,
                 prompt: "Description",
-                lines: 2...4,
-                onChange: { itemDescription = $0 }
+                lines: 2...4
             )
             field(
                 .workshopNotes,
                 text: $workshopNotes,
                 prompt: "Workshop notes",
-                lines: 3...6,
-                onChange: { workshopNotes = $0 }
+                lines: 3...6
             )
         }
     }
@@ -205,8 +201,7 @@ struct FFMetadataInspectorSheet: View {
         _ field: FFMetadataField,
         text: Binding<String>,
         prompt: String,
-        lines: ClosedRange<Int>? = nil,
-        onChange: @escaping (String) -> Void
+        lines: ClosedRange<Int>? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(field.label)
@@ -233,7 +228,7 @@ struct FFMetadataInspectorSheet: View {
                 }
                 .accessibilityIdentifier(field.accessibilityIdentifier)
                 .onChange(of: text.wrappedValue) { _, newValue in
-                    onChange(newValue)
+                    onSetField(field, newValue)
                 }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
