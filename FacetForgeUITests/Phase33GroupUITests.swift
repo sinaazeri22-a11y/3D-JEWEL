@@ -58,6 +58,25 @@ final class Phase33GroupUITests: XCTestCase {
             "Multi dropped Shank when Stone was added; value='\(shank.value ?? "")'"
         )
 
+        // Multi must go off again: every later row tap in this test asserts a
+        // single selection, and an extend tap would leave the old node in it.
+        // Doing it here, while the chip is still above the just-tapped Stone,
+        // avoids returning to it after grouping; switching the mode does not
+        // change what is selected, which the next assertion proves.
+        XCTAssertTrue(reveal(multi, inspector: inspector), "the Multi control left the inspector")
+        multi.tap()
+        XCTAssertTrue(
+            waitFor(timeout: 10, { !multi.isSelected }),
+            "the Multi chip did not turn off"
+        )
+        XCTAssertTrue(
+            waitFor(timeout: 10, {
+                ((shank.value as? String) ?? "").contains("selected")
+                    && ((stone.value as? String) ?? "").contains("selected")
+            }),
+            "turning Multi off changed the selection before grouping"
+        )
+
         let groupChip = element("tree.groupSelection", app)
         XCTAssertTrue(reveal(groupChip, inspector: inspector), "the group command is missing")
         XCTAssertTrue(groupChip.isEnabled, "two unlocked sibling roots should be groupable")
@@ -74,10 +93,6 @@ final class Phase33GroupUITests: XCTestCase {
             "the group did not report both children; value='\(group.value ?? "")'"
         )
 
-        // Multi must go off again: every later row tap in this test asserts a
-        // single selection, and an extend tap would leave the old node in it.
-        XCTAssertTrue(reveal(multi, inspector: inspector), "the Multi control left the inspector")
-        multi.tap()
         XCTAssertTrue(
             waitFor(timeout: 15, { ((stone.value as? String) ?? "").contains("level 2") }),
             "Stone did not nest under the new group; value='\(stone.value ?? "")'"
@@ -236,24 +251,21 @@ final class Phase33GroupUITests: XCTestCase {
         return pinned.exists ? min(maxY, pinned.frame.minY) : maxY
     }
 
-    /// Scrolls from the inspector's outer gutter. A swipe in the middle lands
-    /// on an object-tree row, whose long-press-drag gesture never yields to the
-    /// scroll view, so a reveal from the centre can leave the view where it was.
-    /// The drag must also stay above the inspector's pinned array panel: a
-    /// start at 85% of the column is inside that panel and scrolls nothing.
+    /// Uses the system swipe the Phase 32 audit already proved on this
+    /// inspector. A hand-built coordinate drag was tried first and failed in a
+    /// way that is worth recording: after grouping, the scroll rested with the
+    /// tree's help text under the drag's start point, and repeated drags from
+    /// there changed the offset by nothing at all, while the same drags had
+    /// moved the view before grouping. The system swipe starts on the row area
+    /// and always pans, so the direction is chosen from the target's frame and
+    /// overshoot is corrected by the next iteration.
     @MainActor
     private func scroll(_ inspector: XCUIElement, up: Bool) {
-        // A short step (about 340 pt) so a check lands inside each panel rather
-        // than jumping over a 300 pt section between two long swipes. The drag
-        // starts in the column's middle: the leading gutter is padding that the
-        // ScrollView does not always take as a pan in this hierarchy.
-        let start = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.6 : 0.35)
-        )
-        let end = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.35 : 0.6)
-        )
-        start.press(forDuration: 0.05, thenDragTo: end)
+        if up {
+            inspector.swipeUp()
+        } else {
+            inspector.swipeDown()
+        }
     }
 
     private func settle() {
