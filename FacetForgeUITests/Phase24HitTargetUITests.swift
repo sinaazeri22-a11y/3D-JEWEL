@@ -9,10 +9,14 @@ final class Phase24HitTargetUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         // The hierarchy audit walks ten element queries at each of seven
         // stages and every query is an accessibility snapshot, so a completed
-        // audit costs 4-5 minutes on a loaded runner. The workflow's 240 s
-        // default flagged a finished audit as a hang in run 42406979558; the
-        // checks are unchanged and only this class's ceiling moves.
-        executionTimeAllowance = 480
+        // audit costs 4-7 minutes on a loaded runner. The workflow's 240 s
+        // default flagged a finished audit as a hang in run 42406979558, and
+        // 480 s did the same in run 42572459983 while the audit was still
+        // walking buttons at 477 s with ~2 s per query; the same code finished
+        // the audit in 282 s in run 42569774037. The ceiling is a hang bound,
+        // not a correctness gate, so it moves to 720 s while every assertion
+        // and the 44 pt minimum stay exactly as they were.
+        executionTimeAllowance = 720
     }
 
     override func tearDownWithError() throws {
@@ -146,7 +150,12 @@ final class Phase24HitTargetUITests: XCTestCase {
 
         for (type, query) in queries {
             for element in query.allElementsBoundByIndex {
-                guard element.exists, element.isHittable else { continue }
+                // `exists` is another accessibility snapshot for the same
+                // element and adds nothing: a missing element is not hittable
+                // and its frame is empty, so the two guards below skip it. The
+                // audit runs the same checks on the same controls with a third
+                // fewer queries.
+                guard element.isHittable else { continue }
                 let frame = element.frame
                 guard frame.width > 0, frame.height > 0 else { continue }
                 checked += 1
@@ -172,7 +181,7 @@ final class Phase24HitTargetUITests: XCTestCase {
             "gumball.plane.xz",
         ] {
             let element = app.descendants(matching: .any)[identifier]
-            guard element.exists, element.isHittable else { continue }
+            guard element.isHittable else { continue }
             let frame = element.frame
             guard frame.width > 0, frame.height > 0 else { continue }
             checked += 1
