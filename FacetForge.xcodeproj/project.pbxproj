@@ -66,6 +66,7 @@
 		A10000000000000000000091 /* FFTransformPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000092 /* FFTransformPanel.swift */; };
 		A10000000000000000000093 /* FFArrays.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000094 /* FFArrays.swift */; };
 		A10000000000000000000095 /* FFArrayPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000096 /* FFArrayPanel.swift */; };
+		A10000000000000000000097 /* FFMaterials.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000098 /* FFMaterials.swift */; };
 		A2000000000000000000000B /* AppIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppIdentityTests.swift */; };
 		A2000000000000000000000F /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* DesignSystemTests.swift */; };
 		A20000000000000000000011 /* ComponentSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* ComponentSnapshotTests.swift */; };
@@ -101,6 +102,7 @@
 		A2000000000000000000004F /* Phase32ObjectTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000050 /* Phase32ObjectTreeTests.swift */; };
 		A20000000000000000000051 /* Phase33GroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000052 /* Phase33GroupingTests.swift */; };
 		A20000000000000000000053 /* Phase34ArrayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000054 /* Phase34ArrayTests.swift */; };
+		A20000000000000000000055 /* Phase35MaterialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000056 /* Phase35MaterialTests.swift */; };
 		A3000000000000000000001F /* LayerPanelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000001E /* LayerPanelUITests.swift */; };
 		A30000000000000000000021 /* PerformanceHUDUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000020 /* PerformanceHUDUITests.swift */; };
 		A30000000000000000000023 /* Phase23SmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000022 /* Phase23SmokeUITests.swift */; };
@@ -111,6 +113,7 @@
 		A3000000000000000000002D /* Phase32ObjectTreeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000002C /* Phase32ObjectTreeUITests.swift */; };
 		A3000000000000000000002F /* Phase33GroupUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000030 /* Phase33GroupUITests.swift */; };
 		A30000000000000000000031 /* Phase34ArrayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000032 /* Phase34ArrayUITests.swift */; };
+		A30000000000000000000033 /* Phase35MaterialUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000034 /* Phase35MaterialUITests.swift */; };
 		A3000000000000000000000B /* LaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000002 /* LaunchTests.swift */; };
 		A3000000000000000000000F /* GalleryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000000E /* GalleryTests.swift */; };
 		A30000000000000000000011 /* AdaptiveShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000010 /* AdaptiveShellTests.swift */; };
@@ -200,6 +203,7 @@
 		A10000000000000000000092 /* FFTransformPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFTransformPanel.swift; sourceTree = "<group>"; };
 		A10000000000000000000094 /* FFArrays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFArrays.swift; sourceTree = "<group>"; };
 		A10000000000000000000096 /* FFArrayPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFArrayPanel.swift; sourceTree = "<group>"; };
+		A10000000000000000000098 /* FFMaterials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFMaterials.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* AppIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIdentityTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000000E /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000010 /* ComponentSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentSnapshotTests.swift; sourceTree = "<group>"; };
@@ -235,6 +239,7 @@
 		A20000000000000000000050 /* Phase32ObjectTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase32ObjectTreeTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000052 /* Phase33GroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase33GroupingTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000054 /* Phase34ArrayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase34ArrayTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000056 /* Phase35MaterialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase35MaterialTests.swift; sourceTree = "<group>"; };
 		A3000000000000000000001E /* LayerPanelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerPanelUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000020 /* PerformanceHUDUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceHUDUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000022 /* Phase23SmokeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase23SmokeUITests.swift; sourceTree = "<group>"; };
@@ -245,6 +250,7 @@
 		A3000000000000000000002C /* Phase32ObjectTreeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase32ObjectTreeUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000030 /* Phase33GroupUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase33GroupUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000032 /* Phase34ArrayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase34ArrayUITests.swift; sourceTree = "<group>"; };
+		A30000000000000000000034 /* Phase35MaterialUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase35MaterialUITests.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* FacetForgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FacetForgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000002 /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
 		A3000000000000000000000E /* GalleryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryTests.swift; sourceTree = "<group>"; };
@@ -416,6 +422,7 @@
 				A1000000000000000000008C /* FFObjectTree.swift */,
 				A10000000000000000000090 /* FFGrouping.swift */,
 				A10000000000000000000094 /* FFArrays.swift */,
+				A10000000000000000000098 /* FFMaterials.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
@@ -471,6 +478,7 @@
 				A20000000000000000000050 /* Phase32ObjectTreeTests.swift */,
 				A20000000000000000000052 /* Phase33GroupingTests.swift */,
 				A20000000000000000000054 /* Phase34ArrayTests.swift */,
+				A20000000000000000000056 /* Phase35MaterialTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -497,6 +505,7 @@
 				A3000000000000000000002C /* Phase32ObjectTreeUITests.swift */,
 				A30000000000000000000030 /* Phase33GroupUITests.swift */,
 				A30000000000000000000032 /* Phase34ArrayUITests.swift */,
+				A30000000000000000000034 /* Phase35MaterialUITests.swift */,
 			);
 			path = FacetForgeUITests;
 			sourceTree = "<group>";
@@ -688,6 +697,7 @@
 				A10000000000000000000091 /* FFTransformPanel.swift in Sources */,
 				A10000000000000000000093 /* FFArrays.swift in Sources */,
 				A10000000000000000000095 /* FFArrayPanel.swift in Sources */,
+				A10000000000000000000097 /* FFMaterials.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -730,6 +740,7 @@
 				A2000000000000000000004F /* Phase32ObjectTreeTests.swift in Sources */,
 				A20000000000000000000051 /* Phase33GroupingTests.swift in Sources */,
 				A20000000000000000000053 /* Phase34ArrayTests.swift in Sources */,
+				A20000000000000000000055 /* Phase35MaterialTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -756,6 +767,7 @@
 				A3000000000000000000002D /* Phase32ObjectTreeUITests.swift in Sources */,
 				A3000000000000000000002F /* Phase33GroupUITests.swift in Sources */,
 				A30000000000000000000031 /* Phase34ArrayUITests.swift in Sources */,
+				A30000000000000000000033 /* Phase35MaterialUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -66,6 +66,35 @@ struct FFRenderMesh: Equatable, Sendable {
     }
 }
 
+/// One material's slice of a node's faces. `id` is the face group that owns
+/// the material (or the node itself for the base slice), so the renderer can
+/// cache an unchanged part across frames. Parts partition the node's triangles;
+/// the node's `mesh` remains the whole payload for picking and bounds.
+struct FFRenderPart: Equatable, Sendable, Identifiable {
+    let id: UUID
+    var mesh: FFRenderMesh
+    var material: FFRenderMaterial
+
+    init(id: UUID, mesh: FFRenderMesh, material: FFRenderMaterial) {
+        self.id = id
+        self.mesh = mesh
+        self.material = material
+    }
+
+    var triangleCount: Int { mesh.triangleCount }
+
+    /// FNV-1a over this part's indices. A face group's id survives a
+    /// reassignment that moves triangles between materials, so the count alone
+    /// cannot tell the renderer that its cached buffer is stale; this can.
+    var signature: UInt64 {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for index in mesh.indices {
+            hash = (hash ^ UInt64(index)) &* 0x0000_0100_0000_01b3
+        }
+        return hash
+    }
+}
+
 /// One mesh placed in the world. `id` is stable so the renderer can cache the
 /// vertex buffers of an unchanged node across frames.
 struct FFRenderNode: Equatable, Sendable, Identifiable {
@@ -82,6 +111,9 @@ struct FFRenderNode: Equatable, Sendable, Identifiable {
     /// The colour of the layer this node draws on. Wireframe draws its line
     /// work in this colour; every other mode keeps the mode's own edge colour.
     var layerColor: FFRGBA
+    /// Per-material face slices. Empty for a node with no face groups, which
+    /// draws exactly as it did before Phase 35.
+    var parts: [FFRenderPart]
 
     init(
         id: UUID = UUID(),
@@ -92,7 +124,8 @@ struct FFRenderNode: Equatable, Sendable, Identifiable {
         isSelected: Bool = false,
         kind: FFPickKind = .solid,
         isVisible: Bool = true,
-        layerColor: FFRGBA = .gold
+        layerColor: FFRGBA = .gold,
+        parts: [FFRenderPart] = []
     ) {
         self.id = id
         self.name = name
@@ -103,6 +136,7 @@ struct FFRenderNode: Equatable, Sendable, Identifiable {
         self.kind = kind
         self.isVisible = isVisible
         self.layerColor = layerColor
+        self.parts = parts
     }
 }
 

@@ -78,6 +78,30 @@
       "type": "string",
       "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
     },
+    "faceGroup": {
+      "type": "object",
+      "required": ["id", "name", "materialID", "triangles"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string" },
+        "materialID": { "$ref": "#/$defs/uuid" },
+        "triangles": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "additionalProperties": true
+    },
+    "alloyPreset": {
+      "enum": [
+        "yellow-gold-18k",
+        "rose-gold-18k",
+        "white-gold-18k",
+        "platinum-950",
+        "palladium-950",
+        "sterling-silver"
+      ]
+    },
     "arrayParameters": {
       "type": "object",
       "required": ["kind", "count", "offset", "direction", "axis", "totalAngle"],
@@ -130,7 +154,8 @@
         "name": { "type": "string" },
         "baseColor": { "$ref": "#/$defs/rgba" },
         "metallic": { "type": "number", "minimum": 0, "maximum": 1 },
-        "roughness": { "type": "number", "minimum": 0, "maximum": 1 }
+        "roughness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "preset": { "$ref": "#/$defs/alloyPreset" }
       },
       "additionalProperties": true
     },
@@ -158,6 +183,10 @@
         "layerID": { "$ref": "#/$defs/uuid" },
         "pivot": { "$ref": "#/$defs/point3" },
         "array": { "$ref": "#/$defs/arrayParameters" },
+        "faceGroups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/faceGroup" }
+        },
         "kind": { "type": "string" },
         "children": {
           "type": "array",

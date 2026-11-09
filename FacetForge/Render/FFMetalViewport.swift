@@ -158,6 +158,8 @@ private struct FFMeshGPUBuffer {
     let edgeIndexCount: Int
     let vertexCount: Int
     let triangleCount: Int
+    /// Content signature for a face part; zero for a whole-node buffer.
+    let signature: UInt64
 }
 
 /// The mesh uniforms. The layout mirrors `FFMeshUniforms` in the shader below
@@ -216,7 +218,11 @@ final class FFMetalViewportRenderer {
     private let outlineDepthState: MTLDepthStencilState
     private let shadowDepthState: MTLDepthStencilState
     private let vertexBuffer: MTLBuffer
-    private var meshBuffers: [UUID: FFMeshGPUBuffer] = [:]
+    private struct FFMeshBufferKey: Hashable {
+        let nodeID: UUID
+        let partID: UUID?
+    }
+    private var meshBuffers: [FFMeshBufferKey: FFMeshGPUBuffer] = [:]
     private(set) var statistics = FFFrameStatistics()
     /// Draw calls and triangles submitted by the last encoded pass. Phase 21's
     /// overlay and its exact-count test read this; the counters are incremented
@@ -835,34 +841,76 @@ final class FFMetalViewportRenderer {
             encoder.setDepthStencilState(meshDepthState)
             encoder.setCullMode(.back)
             for node in scene.nodes where node.isVisible {
-                guard let buffers = buffers(for: node.mesh, nodeID: node.id) else { continue }
-                var uniforms = meshUniforms(
-                    node: node,
-                    camera: camera,
-                    viewProjection: viewProjection,
-                    viewport: viewport,
-                    mode: mode
-                )
-                encoder.setVertexBuffer(buffers.vertices, offset: 0, index: 0)
-                encoder.setVertexBuffer(buffers.indices, offset: 0, index: 2)
-                encoder.setVertexBytes(
-                    &uniforms,
-                    length: MemoryLayout<FFMeshUniforms>.stride,
-                    index: 1
-                )
-                encoder.setFragmentBytes(
-                    &uniforms,
-                    length: MemoryLayout<FFMeshUniforms>.stride,
-                    index: 1
-                )
-                encoder.drawIndexedPrimitives(
-                    type: .triangle,
-                    indexCount: buffers.indexCount,
-                    indexType: .uint32,
-                    indexBuffer: buffers.indices,
-                    indexBufferOffset: 0
-                )
-                counters.recordTriangles(buffers.indexCount / 3)
+                // A node with face groups draws one indexed range per material
+                // over the same vertex buffer; a node without them keeps the
+                // single-draw path it had before Phase 35.
+                if node.parts.isEmpty {
+                    guard let buffers = buffers(for: node.mesh, nodeID: node.id) else { continue }
+                    var uniforms = meshUniforms(
+                        node: node,
+                        camera: camera,
+                        viewProjection: viewProjection,
+                        viewport: viewport,
+                        mode: mode
+                    )
+                    encoder.setVertexBuffer(buffers.vertices, offset: 0, index: 0)
+                    encoder.setVertexBuffer(buffers.indices, offset: 0, index: 2)
+                    encoder.setVertexBytes(
+                        &uniforms,
+                        length: MemoryLayout<FFMeshUniforms>.stride,
+                        index: 1
+                    )
+                    encoder.setFragmentBytes(
+                        &uniforms,
+                        length: MemoryLayout<FFMeshUniforms>.stride,
+                        index: 1
+                    )
+                    encoder.drawIndexedPrimitives(
+                        type: .triangle,
+                        indexCount: buffers.indexCount,
+                        indexType: .uint32,
+                        indexBuffer: buffers.indices,
+                        indexBufferOffset: 0
+                    )
+                    counters.recordTriangles(buffers.indexCount / 3)
+                } else {
+                    for part in node.parts {
+                        guard let buffers = buffers(
+                            for: part.mesh,
+                            nodeID: node.id,
+                            partID: part.id,
+                            signature: part.signature
+                        ) else { continue }
+                        var uniforms = meshUniforms(
+                            node: node,
+                            camera: camera,
+                            viewProjection: viewProjection,
+                            viewport: viewport,
+                            mode: mode,
+                            material: part.material
+                        )
+                        encoder.setVertexBuffer(buffers.vertices, offset: 0, index: 0)
+                        encoder.setVertexBuffer(buffers.indices, offset: 0, index: 2)
+                        encoder.setVertexBytes(
+                            &uniforms,
+                            length: MemoryLayout<FFMeshUniforms>.stride,
+                            index: 1
+                        )
+                        encoder.setFragmentBytes(
+                            &uniforms,
+                            length: MemoryLayout<FFMeshUniforms>.stride,
+                            index: 1
+                        )
+                        encoder.drawIndexedPrimitives(
+                            type: .triangle,
+                            indexCount: buffers.indexCount,
+                            indexType: .uint32,
+                            indexBuffer: buffers.indices,
+                            indexBufferOffset: 0
+                        )
+                        counters.recordTriangles(buffers.indexCount / 3)
+                    }
+                }
             }
         }
 
@@ -914,12 +962,14 @@ final class FFMetalViewportRenderer {
         camera: FFCamera,
         viewProjection: Mat4,
         viewport: SIMD2<Float>,
-        mode: FFDisplayMode
+        mode: FFDisplayMode,
+        material: FFRenderMaterial? = nil
     ) -> FFMeshUniforms {
         let model = node.transform.simdMatrix
         // Clay and Technical replace the document's material on the way to the
         // GPU. The node itself is untouched, so leaving the mode restores it.
-        let surface = mode.materialOverride ?? node.material
+        // A face part supplies its own material; the node's is the fallback.
+        let surface = mode.materialOverride ?? material ?? node.material
         let color = surface.baseColor
         let edge = mode.strokeColor(for: node)
         let eye = camera.position
@@ -947,11 +997,18 @@ final class FFMetalViewportRenderer {
         )
     }
 
-    private func buffers(for mesh: FFRenderMesh, nodeID: UUID) -> FFMeshGPUBuffer? {
-        if let cached = meshBuffers[nodeID],
+    private func buffers(
+        for mesh: FFRenderMesh,
+        nodeID: UUID,
+        partID: UUID? = nil,
+        signature: UInt64 = 0
+    ) -> FFMeshGPUBuffer? {
+        let key = FFMeshBufferKey(nodeID: nodeID, partID: partID)
+        if let cached = meshBuffers[key],
            cached.indexCount == mesh.indices.count,
            cached.edgeIndexCount == mesh.indices.count * 2,
-           cached.vertexCount == mesh.positions.count
+           cached.vertexCount == mesh.positions.count,
+           cached.signature == signature
         {
             return cached
         }
@@ -1006,9 +1063,10 @@ final class FFMetalViewportRenderer {
             indexCount: mesh.indices.count,
             edgeIndexCount: edgeIndices.count,
             vertexCount: mesh.positions.count,
-            triangleCount: mesh.triangleCount
+            triangleCount: mesh.triangleCount,
+            signature: signature
         )
-        meshBuffers[nodeID] = buffer
+        meshBuffers[key] = buffer
         return buffer
     }
 

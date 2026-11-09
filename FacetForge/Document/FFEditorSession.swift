@@ -764,6 +764,175 @@ final class FFEditorSession: ObservableObject {
         updateArray(id) { $0.axis = axis }
     }
 
+    // MARK: - Materials
+
+    /// The material sheet's read-only projection. The selected node supplies
+    /// its face groups; lock is resolved here so the panel never reads layers.
+    func materialInfo() -> FFMaterialInfo {
+        let selectedID: UUID? = selection.selectedIDs.count == 1
+            ? selection.selectedIDs.first
+            : nil
+        return documentSession.document.materialInfo(
+            for: selectedID,
+            isLocked: selectedID.map { isLocked(nodeID: $0) } ?? false
+        )
+    }
+
+    /// Applies an alloy preset to one document material. Every face that names
+    /// the material — a node's base material or any face group — changes with
+    /// it, and the whole change is one undo step.
+    @discardableResult
+    func setMaterialPreset(_ id: UUID, preset: FFAlloyPreset) -> Bool {
+        guard let material = documentSession.document.material(withID: id) else {
+            return false
+        }
+        let changed = documentSession.perform("Alloy \(preset.label) · \(material.name)") { document in
+            _ = document.setMaterialPreset(id, preset: preset)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(material.name) · \(preset.label)"
+        return true
+    }
+
+    @discardableResult
+    func adjustMaterialMetallic(_ id: UUID, by delta: Double) -> Bool {
+        guard let material = documentSession.document.material(withID: id) else {
+            return false
+        }
+        let next = FFMath.clamp(material.metallic + delta, to: 0...1)
+        guard next != material.metallic else { return false }
+        let changed = documentSession.perform("Metallic \(material.name)") { document in
+            _ = document.setMaterialParameters(id, metallic: next)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(material.name) · metallic \(FFPrecision.fixed(next, decimals: 2))"
+        return true
+    }
+
+    @discardableResult
+    func adjustMaterialRoughness(_ id: UUID, by delta: Double) -> Bool {
+        guard let material = documentSession.document.material(withID: id) else {
+            return false
+        }
+        let next = FFMath.clamp(material.roughness + delta, to: 0...1)
+        guard next != material.roughness else { return false }
+        let changed = documentSession.perform("Roughness \(material.name)") { document in
+            _ = document.setMaterialParameters(id, roughness: next)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(material.name) · roughness \(FFPrecision.fixed(next, decimals: 2))"
+        return true
+    }
+
+    /// A colour-picker drag emits a stream of values; the coalescing key keeps
+    /// the whole drag as one undo step while still writing the journal on every
+    /// committed colour.
+    @discardableResult
+    func setMaterialColor(_ id: UUID, color: FFRGBA) -> Bool {
+        guard let material = documentSession.document.material(withID: id) else {
+            return false
+        }
+        let changed = documentSession.perform(
+            "Colour \(material.name)",
+            coalescingKey: "material-colour-\(id.uuidString)"
+        ) { document in
+            _ = document.setMaterialParameters(id, baseColor: color)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(material.name) · colour"
+        return true
+    }
+
+    /// Assigns a material to all of a mesh node's faces that no face group
+    /// owns. On a node without groups that is the whole object.
+    @discardableResult
+    func assignMaterialToNode(_ nodeID: UUID, materialID: UUID) -> Bool {
+        guard let node = documentSession.document.node(withID: nodeID),
+              node.meshTriangleCount > 0,
+              !isLocked(nodeID: nodeID),
+              documentSession.document.material(withID: materialID) != nil
+        else { return false }
+        let changed = documentSession.perform("Assign material to \(node.name)") { document in
+            _ = document.setNodeMaterial(nodeID: nodeID, materialID: materialID)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(node.name) · base material"
+        return true
+    }
+
+    @discardableResult
+    func assignMaterialToFaceGroup(
+        nodeID: UUID,
+        groupID: UUID,
+        materialID: UUID
+    ) -> Bool {
+        guard let node = documentSession.document.node(withID: nodeID),
+              let group = node.faceGroups?.first(where: { $0.id == groupID }),
+              !isLocked(nodeID: nodeID),
+              documentSession.document.material(withID: materialID) != nil
+        else { return false }
+        let changed = documentSession.perform("Assign \(group.name)") { document in
+            _ = document.setFaceGroupMaterial(
+                nodeID: nodeID,
+                groupID: groupID,
+                materialID: materialID
+            )
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(group.name) · material"
+        return true
+    }
+
+    @discardableResult
+    func removeFaceGroup(nodeID: UUID, groupID: UUID) -> Bool {
+        guard let node = documentSession.document.node(withID: nodeID),
+              node.faceGroups?.contains(where: { $0.id == groupID }) == true,
+              !isLocked(nodeID: nodeID)
+        else { return false }
+        let changed = documentSession.perform("Remove face group") { document in
+            _ = document.removeFaceGroup(nodeID: nodeID, groupID: groupID)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(node.name) · face group removed"
+        return true
+    }
+
+    /// The one commit path for a new face group. The panel has no creation
+    /// command yet; the document bridge and tests use this to establish the
+    /// subsets that imported and modelled geometry will carry.
+    @discardableResult
+    func assignFaceGroup(
+        nodeID: UUID,
+        name: String,
+        materialID: UUID,
+        triangles: [Int]
+    ) -> UUID? {
+        guard let node = documentSession.document.node(withID: nodeID),
+              !isLocked(nodeID: nodeID),
+              documentSession.document.material(withID: materialID) != nil
+        else { return nil }
+        var created: UUID?
+        let changed = documentSession.perform("Assign faces on \(node.name)") { document in
+            created = document.assignFaceGroup(
+                nodeID: nodeID,
+                name: name,
+                materialID: materialID,
+                triangles: triangles
+            )
+        }
+        guard changed, let created else { return nil }
+        syncDocumentState()
+        documentStatus = "\(node.name) · \(triangles.count) faces"
+        return created
+    }
+
     /// Rebuilds every published value that is derived from the document. The
     /// document session remains the only owner; this is the projection the
     /// shell renders.
@@ -1192,6 +1361,32 @@ final class FFEditorSession: ObservableObject {
                     .flatMap { document.material(withID: $0) }
                     .map(FFRenderMaterial.init(from:)) ?? .gold
                 let layer = document.layer(forNodeID: node.id)
+                let parts: [FFRenderPart] = document.faceAssignments(for: node.id).compactMap { assignment in
+                    var indices: [UInt32] = []
+                    indices.reserveCapacity(assignment.triangles.count * 3)
+                    for triangleIndex in assignment.triangles {
+                        guard triangleIndex >= 0, triangleIndex < mesh.triangles.count else {
+                            continue
+                        }
+                        let triangle = mesh.triangles[triangleIndex]
+                        indices.append(UInt32(triangle.a))
+                        indices.append(UInt32(triangle.b))
+                        indices.append(UInt32(triangle.c))
+                    }
+                    guard !indices.isEmpty else { return nil }
+                    let surface = assignment.materialID
+                        .flatMap { document.material(withID: $0) }
+                        .map(FFRenderMaterial.init(from:)) ?? material
+                    return FFRenderPart(
+                        id: assignment.groupIDs.first ?? node.id,
+                        mesh: FFRenderMesh(
+                            positions: renderMesh.positions,
+                            normals: renderMesh.normals,
+                            indices: indices
+                        ),
+                        material: surface
+                    )
+                }
                 nodes.append(FFRenderNode(
                     id: node.id,
                     name: node.name,
@@ -1200,7 +1395,8 @@ final class FFEditorSession: ObservableObject {
                     material: material,
                     kind: node.kind ?? .solid,
                     isVisible: node.isVisible && (layer?.isVisible ?? true),
-                    layerColor: layer?.color ?? FFRGBA.gold
+                    layerColor: layer?.color ?? FFRGBA.gold,
+                    parts: parts
                 ))
             }
             for child in node.children {

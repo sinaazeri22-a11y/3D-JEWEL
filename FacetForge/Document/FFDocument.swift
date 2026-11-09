@@ -349,19 +349,26 @@ struct FFMaterial: Codable, Equatable, Identifiable, Sendable {
     var baseColor: FFRGBA
     var metallic: Double
     var roughness: Double
+    /// The alloy preset that last wrote the three surface values. Optional so
+    /// schema-1 documents written before Phase 35 still decode; a missing
+    /// preset means the material is custom. Encoding omits it while nil, so an
+    /// untouched document's canonical hash does not move.
+    var preset: FFAlloyPreset?
 
     init(
         id: UUID = UUID(),
         name: String,
         baseColor: FFRGBA = .gold,
         metallic: Double = 1,
-        roughness: Double = 0.25
+        roughness: Double = 0.25,
+        preset: FFAlloyPreset? = nil
     ) {
         self.id = id
         self.name = name
         self.baseColor = baseColor
         self.metallic = FFMath.clamp(metallic, to: 0...1)
         self.roughness = FFMath.clamp(roughness, to: 0...1)
+        self.preset = preset
     }
 }
 
@@ -390,6 +397,11 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
     /// decode; a missing array is an ordinary group. Encoding omits it while
     /// nil, so an untouched document's canonical hash does not move.
     var array: FFArrayParameters?
+    /// Phase 35's per-face material groups. Optional so schema-1 documents
+    /// written before Phase 35 still decode; a missing array means the whole
+    /// mesh uses `materialID`. Encoding omits it while nil, so an untouched
+    /// document's canonical hash does not move.
+    var faceGroups: [FFFaceGroup]?
     var children: [FFNode]
 
     init(
@@ -403,6 +415,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         layerID: UUID? = nil,
         pivot: FFPoint3? = nil,
         array: FFArrayParameters? = nil,
+        faceGroups: [FFFaceGroup]? = nil,
         children: [FFNode] = []
     ) {
         self.id = id
@@ -415,6 +428,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         self.layerID = layerID
         self.pivot = pivot
         self.array = array
+        self.faceGroups = faceGroups
         self.children = children
     }
 

@@ -324,6 +324,20 @@ struct FFAppShell: View {
                             selection: $session.selection,
                             transformInfo: session.transformInfo(),
                             arrayInfo: session.arrayInfo(),
+                            materialInfo: session.materialInfo(),
+                            onSetMaterialPreset: { session.setMaterialPreset($0, preset: $1) },
+                            onAdjustMaterialMetallic: { session.adjustMaterialMetallic($0, by: $1) },
+                            onAdjustMaterialRoughness: { session.adjustMaterialRoughness($0, by: $1) },
+                            onSetMaterialColor: { session.setMaterialColor($0, color: $1) },
+                            onAssignMaterialToNode: { session.assignMaterialToNode($0, materialID: $1) },
+                            onAssignMaterialToGroup: {
+                                session.assignMaterialToFaceGroup(
+                                    nodeID: $0,
+                                    groupID: $1,
+                                    materialID: $2
+                                )
+                            },
+                            onRemoveFaceGroup: { session.removeFaceGroup(nodeID: $0, groupID: $1) },
                             canGroupSelection: session.canGroupSelection,
                             canUngroupSelection: session.canUngroupSelection(),
                             canDuplicateSelection: session.canDuplicateSelection,
@@ -1283,6 +1297,14 @@ private struct FFInspector: View {
     @Binding var selection: FFSelectionState
     let transformInfo: FFTransformInfo?
     let arrayInfo: FFArrayInfo?
+    let materialInfo: FFMaterialInfo
+    let onSetMaterialPreset: (UUID, FFAlloyPreset) -> Void
+    let onAdjustMaterialMetallic: (UUID, Double) -> Void
+    let onAdjustMaterialRoughness: (UUID, Double) -> Void
+    let onSetMaterialColor: (UUID, FFRGBA) -> Void
+    let onAssignMaterialToNode: (UUID, UUID) -> Void
+    let onAssignMaterialToGroup: (UUID, UUID, UUID) -> Void
+    let onRemoveFaceGroup: (UUID, UUID) -> Void
     let canGroupSelection: Bool
     let canUngroupSelection: Bool
     let canDuplicateSelection: Bool
@@ -1399,6 +1421,17 @@ private struct FFInspector: View {
                         .foregroundStyle(FFPalette.textPrimary.color)
 
                     Spacer(minLength: 0)
+
+                    FFMaterialInspectorLauncher(
+                        info: materialInfo,
+                        onSetPreset: onSetMaterialPreset,
+                        onAdjustMetallic: onAdjustMaterialMetallic,
+                        onAdjustRoughness: onAdjustMaterialRoughness,
+                        onSetColor: onSetMaterialColor,
+                        onAssignToNode: onAssignMaterialToNode,
+                        onAssignToGroup: onAssignMaterialToGroup,
+                        onRemoveGroup: onRemoveFaceGroup
+                    )
 
                     Button(action: onCollapse) {
                         Image(systemName: "sidebar.trailing")

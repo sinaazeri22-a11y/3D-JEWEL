@@ -29,17 +29,22 @@ enum FFRealitySceneBuilder {
         root.name = "FacetForgeScene"
 
         for node in scene.nodes {
-            guard let resource = try? MeshResource.generate(from: [descriptor(for: node.mesh)]) else {
-                continue
+            let surfaces: [(FFRenderMesh, FFRenderMaterial, String)] = node.parts.isEmpty
+                ? [(node.mesh, node.material, node.name)]
+                : node.parts.map { ($0.mesh, $0.material, "\(node.name) · material") }
+            for (mesh, surface, name) in surfaces {
+                guard let resource = try? MeshResource.generate(from: [descriptor(for: mesh)]) else {
+                    continue
+                }
+                let material = SimpleMaterial(
+                    color: uiColor(for: surface),
+                    isMetallic: surface.metallic > 0.5
+                )
+                let entity = ModelEntity(mesh: resource, materials: [material])
+                entity.name = name
+                entity.transform = Transform(matrix: node.transform.simdMatrix)
+                root.addChild(entity)
             }
-            let material = SimpleMaterial(
-                color: uiColor(for: node.material),
-                isMetallic: node.material.metallic > 0.5
-            )
-            let entity = ModelEntity(mesh: resource, materials: [material])
-            entity.name = node.name
-            entity.transform = Transform(matrix: node.transform.simdMatrix)
-            root.addChild(entity)
         }
         return root
     }

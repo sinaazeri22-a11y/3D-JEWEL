@@ -643,16 +643,44 @@ enum FFOBJExporter {
             let isMesh = node.geometry?.mesh != nil
             let group = groupName ?? node.name
             if let payload = node.geometry?.mesh,
-               let mesh = payload.mesh,
-               let baked = IndexedMesh(
-                   positions: mesh.positions.map(world.transformedPoint),
-                   triangles: mesh.triangles
-               ) {
-                parts.append(Part(
-                    group: group,
-                    mesh: baked,
-                    materialName: node.materialID.flatMap { names[$0] }
-                ))
+               let mesh = payload.mesh {
+                let bakedPositions = mesh.positions.map(world.transformedPoint)
+                let assignments = document.faceAssignments(for: node.id)
+                if assignments.isEmpty {
+                    if let baked = IndexedMesh(
+                        positions: bakedPositions,
+                        triangles: mesh.triangles
+                    ) {
+                        parts.append(Part(
+                            group: group,
+                            mesh: baked,
+                            materialName: node.materialID.flatMap { names[$0] }
+                        ))
+                    }
+                } else {
+                    // One part per material, all sharing the node's baked
+                    // vertex list. OBJ carries no face groups, so repeating
+                    // the group name writes the same `g` block with several
+                    // `usemtl` sections; a reader recovers the material-to-face
+                    // assignment even though the node split is its own.
+                    for assignment in assignments {
+                        let triangles = assignment.triangles.compactMap { index -> MeshTriangle? in
+                            guard index >= 0, index < mesh.triangles.count else { return nil }
+                            return mesh.triangles[index]
+                        }
+                        guard !triangles.isEmpty,
+                              let baked = IndexedMesh(
+                                  positions: bakedPositions,
+                                  triangles: triangles
+                              )
+                        else { continue }
+                        parts.append(Part(
+                            group: group,
+                            mesh: baked,
+                            materialName: assignment.materialID.flatMap { names[$0] }
+                        ))
+                    }
+                }
             }
             // A mesh node that carries children is itself a group boundary; a
             // container passes its own name down so several material children
