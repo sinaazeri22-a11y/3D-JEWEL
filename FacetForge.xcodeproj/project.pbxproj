@@ -67,6 +67,7 @@
 		A10000000000000000000093 /* FFArrays.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000094 /* FFArrays.swift */; };
 		A10000000000000000000095 /* FFArrayPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000096 /* FFArrayPanel.swift */; };
 		A10000000000000000000097 /* FFMaterials.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000098 /* FFMaterials.swift */; };
+		A10000000000000000000099 /* FFMaterialPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000009A /* FFMaterialPanel.swift */; };
 		A2000000000000000000000B /* AppIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppIdentityTests.swift */; };
 		A2000000000000000000000F /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* DesignSystemTests.swift */; };
 		A20000000000000000000011 /* ComponentSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* ComponentSnapshotTests.swift */; };
@@ -204,6 +205,7 @@
 		A10000000000000000000094 /* FFArrays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFArrays.swift; sourceTree = "<group>"; };
 		A10000000000000000000096 /* FFArrayPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFArrayPanel.swift; sourceTree = "<group>"; };
 		A10000000000000000000098 /* FFMaterials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFMaterials.swift; sourceTree = "<group>"; };
+		A1000000000000000000009A /* FFMaterialPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFMaterialPanel.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* AppIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIdentityTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000000E /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000010 /* ComponentSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentSnapshotTests.swift; sourceTree = "<group>"; };
@@ -356,6 +358,7 @@
 				A1000000000000000000008E /* FFObjectTreePanel.swift */,
 				A10000000000000000000092 /* FFTransformPanel.swift */,
 				A10000000000000000000096 /* FFArrayPanel.swift */,
+				A1000000000000000000009A /* FFMaterialPanel.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -698,6 +701,7 @@
 				A10000000000000000000093 /* FFArrays.swift in Sources */,
 				A10000000000000000000095 /* FFArrayPanel.swift in Sources */,
 				A10000000000000000000097 /* FFMaterials.swift in Sources */,
+				A10000000000000000000099 /* FFMaterialPanel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
