@@ -1390,6 +1390,7 @@ private struct FFInspector: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
         ScrollView {
             VStack(alignment: .leading, spacing: FFSpace.sm) {
                 HStack(spacing: FFSpace.xs) {
@@ -1787,39 +1788,39 @@ private struct FFInspector: View {
             }
             .padding(FFSpace.sm)
         }
-        // Phase 34's commands and the selected array's live parameters stay
-        // pinned here while the tree above scrolls through the array's members.
-        // The creation row never moves: a new array cannot push its own controls
-        // away, and the parameter card grows above it, not through it. Neither
-        // view owns state; every control routes to the session.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                if let arrayInfo {
-                    FFArrayParameterCard(
-                        info: arrayInfo,
-                        lengthUnit: lengthUnit,
-                        onAdjustCount: onAdjustArrayCount,
-                        onAdjustOffset: onAdjustArrayOffset,
-                        onSetDirection: onSetArrayDirection,
-                        onSetAxis: onSetArrayAxis,
-                        onAdjustAngle: onAdjustArrayAngle
-                    )
-                    .padding(.bottom, FFSpace.xxs)
-                }
-
-                FFArrayPanel(
-                    canDuplicate: canDuplicateSelection,
-                    canArray: canArraySelection,
+        // Phase 34's commands and the selected array's live parameters are
+        // docked below the scroll view, not floated over it: the scroll range
+        // ends at the dock's top, so every inspector control can still be
+        // scrolled fully into view. The creation row never moves; the
+        // parameter card grows upward above it. Neither view owns state; every
+        // control routes to the session.
+        VStack(spacing: 0) {
+            if let arrayInfo {
+                FFArrayParameterCard(
                     info: arrayInfo,
-                    onDuplicate: onDuplicate,
-                    onLinear: onLinearArray,
-                    onRadial: onRadialArray
+                    lengthUnit: lengthUnit,
+                    onAdjustCount: onAdjustArrayCount,
+                    onAdjustOffset: onAdjustArrayOffset,
+                    onSetDirection: onSetArrayDirection,
+                    onSetAxis: onSetArrayAxis,
+                    onAdjustAngle: onAdjustArrayAngle
                 )
+                .padding(.bottom, FFSpace.xxs)
             }
-            .padding(.horizontal, FFSpace.sm)
-            .padding(.top, FFSpace.xxs)
-            .padding(.bottom, FFSpace.sm)
-            .background(FFPalette.panel.color)
+
+            FFArrayPanel(
+                canDuplicate: canDuplicateSelection,
+                canArray: canArraySelection,
+                info: arrayInfo,
+                onDuplicate: onDuplicate,
+                onLinear: onLinearArray,
+                onRadial: onRadialArray
+            )
+        }
+        .padding(.horizontal, FFSpace.sm)
+        .padding(.top, FFSpace.xxs)
+        .padding(.bottom, FFSpace.sm)
+        .background(FFPalette.panel.color)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(FFPalette.panel.color)
