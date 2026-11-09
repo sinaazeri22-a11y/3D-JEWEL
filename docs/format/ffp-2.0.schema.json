@@ -1,0 +1,512 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://facetforge.local/format/2.0/manifest.schema.json",
+  "title": "FacetForge .ffp manifest, version 2",
+  "description": "Normative shape of manifest.json inside a version-2 .ffp document bundle. Version 2 keeps the version-1 document body and adds two container rules the schema cannot express: checksums.json must list every owned file the bundle contains (manifest.json included), and every entry in geometry.nodes must name a node in document.rootNodes exactly once. Unknown object members are permitted everywhere and must survive a rewrite.",
+  "type": "object",
+  "required": [
+    "format",
+    "formatVersion",
+    "documentVersion",
+    "createdAt",
+    "modifiedAt",
+    "generator",
+    "document",
+    "geometry"
+  ],
+  "properties": {
+    "format": {
+      "const": "facetforge-document"
+    },
+    "formatVersion": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 2
+    },
+    "documentVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "modifiedAt": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "generator": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "document": {
+      "$ref": "#/$defs/document"
+    },
+    "geometry": {
+      "$ref": "#/$defs/geometry"
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "document": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "name",
+        "displayUnit",
+        "materials",
+        "rootNodes",
+        "displayModes",
+        "layers",
+        "measurements"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "displayUnit": {
+          "enum": [
+            "millimetres",
+            "inches"
+          ]
+        },
+        "materials": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/material"
+          }
+        },
+        "rootNodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "displayModes": {
+          "type": "object"
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/layer"
+          }
+        },
+        "currentLayerID": {
+          "$ref": "#/$defs/uuid"
+        },
+        "measurements": {
+          "type": "array"
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        }
+      },
+      "additionalProperties": true
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "partNumber": {
+          "type": "string"
+        },
+        "sku": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "workshopNotes": {
+          "type": "string"
+        },
+        "manufacturingFlags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/manufacturingFlag"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "manufacturingFlag": {
+      "enum": [
+        "casting",
+        "stone-setting",
+        "hand-engraving",
+        "rhodium-plating",
+        "laser-welding"
+      ]
+    },
+    "faceGroup": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "materialID",
+        "triangles"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "type": "string"
+        },
+        "materialID": {
+          "$ref": "#/$defs/uuid"
+        },
+        "triangles": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "alloyPreset": {
+      "enum": [
+        "yellow-gold-18k",
+        "rose-gold-18k",
+        "white-gold-18k",
+        "platinum-950",
+        "palladium-950",
+        "sterling-silver"
+      ]
+    },
+    "arrayParameters": {
+      "type": "object",
+      "required": [
+        "kind",
+        "count",
+        "offset",
+        "direction",
+        "axis",
+        "totalAngle"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "linear",
+            "radial"
+          ]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 100
+        },
+        "offset": {
+          "type": "number",
+          "minimum": 0
+        },
+        "direction": {
+          "enum": [
+            "x",
+            "y",
+            "z"
+          ]
+        },
+        "axis": {
+          "enum": [
+            "x",
+            "y",
+            "z"
+          ]
+        },
+        "totalAngle": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 360
+        }
+      },
+      "additionalProperties": true
+    },
+    "point3": {
+      "type": "object",
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    },
+    "rgba": {
+      "type": "object",
+      "required": [
+        "red",
+        "green",
+        "blue",
+        "alpha"
+      ],
+      "properties": {
+        "red": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "green": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "blue": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "alpha": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "transform": {
+      "type": "object",
+      "required": [
+        "translation",
+        "rotation",
+        "scale"
+      ],
+      "properties": {
+        "translation": {
+          "$ref": "#/$defs/point3"
+        },
+        "rotation": {
+          "$ref": "#/$defs/point3"
+        },
+        "scale": {
+          "$ref": "#/$defs/point3"
+        }
+      },
+      "additionalProperties": true
+    },
+    "material": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "baseColor",
+        "metallic",
+        "roughness"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "type": "string"
+        },
+        "baseColor": {
+          "$ref": "#/$defs/rgba"
+        },
+        "metallic": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "roughness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "preset": {
+          "$ref": "#/$defs/alloyPreset"
+        }
+      },
+      "additionalProperties": true
+    },
+    "layer": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "color",
+        "isVisible",
+        "isLocked"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "type": "string"
+        },
+        "color": {
+          "$ref": "#/$defs/rgba"
+        },
+        "isVisible": {
+          "type": "boolean"
+        },
+        "isLocked": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "transform",
+        "isVisible",
+        "children"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "type": "string"
+        },
+        "transform": {
+          "$ref": "#/$defs/transform"
+        },
+        "isVisible": {
+          "type": "boolean"
+        },
+        "materialID": {
+          "$ref": "#/$defs/uuid"
+        },
+        "layerID": {
+          "$ref": "#/$defs/uuid"
+        },
+        "pivot": {
+          "$ref": "#/$defs/point3"
+        },
+        "array": {
+          "$ref": "#/$defs/arrayParameters"
+        },
+        "faceGroups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/faceGroup"
+          }
+        },
+        "kind": {
+          "type": "string"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "geometry": {
+      "type": "object",
+      "required": [
+        "buffers",
+        "nodes"
+      ],
+      "properties": {
+        "buffers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/buffer"
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/geometryReference"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "buffer": {
+      "type": "object",
+      "required": [
+        "path",
+        "byteLength",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^geometry/[A-Za-z0-9._-]+$"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": true
+    },
+    "geometryReference": {
+      "type": "object",
+      "required": [
+        "nodeID",
+        "buffer",
+        "offset",
+        "length",
+        "kind"
+      ],
+      "properties": {
+        "nodeID": {
+          "$ref": "#/$defs/uuid"
+        },
+        "buffer": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "curve",
+            "mesh"
+          ]
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

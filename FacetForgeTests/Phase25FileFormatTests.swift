@@ -41,6 +41,9 @@ final class Phase25FileFormatTests: XCTestCase {
                 to: url,
                 thumbnail: FFPThumbnail.png(for: document)
             )
+            // FFP 1.0 stays the normative schema for version-1 files, so the
+            // fixture is a version-1 bundle. Phase 38 owns the current schema.
+            try FFPFormatMigration.writingVersion1Copy(of: url, to: url)
             let manifest = try manifestTree(at: url)
             let errors = validator.validate(manifest)
             XCTAssertEqual(errors, [], "\(name) manifest failed schema validation")
@@ -53,6 +56,7 @@ final class Phase25FileFormatTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appendingPathComponent("sample.ffp")
         try bundle.write(document: sampleDocument(), to: url)
+        try FFPFormatMigration.writingVersion1Copy(of: url, to: url)
         let valid = try manifestTree(at: url)
         XCTAssertEqual(validator.validate(valid), [])
 
@@ -207,12 +211,15 @@ final class Phase25FileFormatTests: XCTestCase {
         let future = directory.appendingPathComponent("future.ffp")
         try bundle.write(document: sampleDocument(), to: future)
         var manifest = try manifestTree(at: future)
-        manifest = manifest.setting("formatVersion", to: .int(2))
+        manifest = manifest.setting("formatVersion", to: .int(FFPFormat.version + 1))
         try manifest.encoded(pretty: true)
             .write(to: future.appendingPathComponent("manifest.json"))
         try bundle.writeChecksums(in: future)
         XCTAssertThrowsError(try bundle.read(from: future)) { error in
-            XCTAssertEqual(error as? FFPFormatError, .unsupportedFormatVersion(2))
+            XCTAssertEqual(
+                error as? FFPFormatError,
+                .unsupportedFormatVersion(FFPFormat.version + 1)
+            )
         }
     }
 

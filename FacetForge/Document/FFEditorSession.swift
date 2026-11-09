@@ -66,6 +66,10 @@ final class FFEditorSession: ObservableObject {
     @Published private(set) var documentStatus: String
     /// The reason a reopen used the last good save. `nil` on a normal open.
     @Published private(set) var recoveryMessage: String?
+    /// What the reader did to an older file. `nil` when the file was already
+    /// the current container version. The status line announces it; the report
+    /// keeps every step it applied.
+    @Published private(set) var migrationReport: FFPMigrationReport?
     /// Where the document was last saved or loaded from. `nil` for a new bench
     /// sample that has never touched disk.
     @Published private(set) var documentURL: URL?
@@ -132,6 +136,7 @@ final class FFEditorSession: ObservableObject {
         self.stoneSummary = initial.stoneSummary()
         self.documentStatus = initial.name
         self.recoveryMessage = nil
+        self.migrationReport = nil
         self.documentURL = documentURL
         self.preservation = nil
         self.selection = document == nil
@@ -1012,6 +1017,7 @@ final class FFEditorSession: ObservableObject {
         documentURL = nil
         preservation = nil
         recoveryMessage = nil
+        migrationReport = nil
         isDirty = false
         autosaveMessage = nil
         documentStatus = "New document"
@@ -1030,6 +1036,7 @@ final class FFEditorSession: ObservableObject {
         documentURL = nil
         preservation = nil
         recoveryMessage = nil
+        migrationReport = nil
         isDirty = false
         autosaveMessage = nil
         documentStatus = "Fixture loaded"
@@ -1275,15 +1282,20 @@ final class FFEditorSession: ObservableObject {
         documentURL = url
         preservation = loaded.preservation
         recoveryMessage = loaded.recovery?.message
+        migrationReport = loaded.migration
         selection = FFSelectionState.initial(for: scene)
         isDirty = false
         lastAutosaveAt = nil
         autosaveMessage = nil
         attachJournalAfterOpen(at: url)
         if recoveryOffer == nil {
-            documentStatus = loaded.recovery == nil
-                ? "Reopened \(url.lastPathComponent)"
-                : "Recovered last good save · \(url.lastPathComponent)"
+            if let migration = loaded.migration {
+                documentStatus = "\(migration.headline) · \(url.lastPathComponent)"
+            } else {
+                documentStatus = loaded.recovery == nil
+                    ? "Reopened \(url.lastPathComponent)"
+                    : "Recovered last good save · \(url.lastPathComponent)"
+            }
         }
     }
 

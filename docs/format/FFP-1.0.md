@@ -5,6 +5,10 @@ Status: **normative for format version 1.** Implemented by
 `FacetForgeTests/Phase25FileFormatTests.swift` against
 [`ffp-1.0.schema.json`](ffp-1.0.schema.json).
 
+This build writes format version 2, specified in [`FFP-2.0.md`](FFP-2.0.md).
+Version 1 remains readable and this document remains the normative description
+of the files it produced.
+
 A `.ffp` document is a **directory bundle**. A bundle is used rather than a
 single file because geometry is binary and grows without bound, because a
 thumbnail should be replaceable without rewriting the model, and because an

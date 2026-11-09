@@ -14,6 +14,44 @@ enum FFLaunchFixtures {
         ProcessInfo.processInfo.arguments.contains("-FFBrowserFixture")
     }
 
+    static var wantsMigrationDemo: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFMigrationFixture")
+    }
+
+    /// A real bundle written by this build, then rewritten as the bundle a
+    /// version-1 app would have produced. The shipping shell opens it through
+    /// the normal reader, so the status line the test reads is the line a user
+    /// sees after opening an old file.
+    static func prepareMigrationDocument() -> URL? {
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+
+        let destination = documents.appendingPathComponent("Legacy Pendant.ffp")
+        let source = documents.appendingPathComponent("Phase38 Source.ffp")
+        for url in [destination, source] {
+            try? FileManager.default.removeItem(at: url)
+        }
+
+        let document = FFDocumentTemplate.pendant.makeDocument()
+        guard (try? FFDocumentStore().save(
+            document,
+            to: source,
+            thumbnail: FFPThumbnail.png(for: document)
+        )) != nil else {
+            return nil
+        }
+        guard (try? FFPFormatMigration.writingVersion1Copy(of: source, to: destination)) != nil else {
+            return nil
+        }
+        try? FileManager.default.removeItem(at: source)
+        return destination
+    }
+
     /// Two real saved bundles in the app's Documents directory, each with the
     /// real thumbnail the editor's save writes. The names carry a Phase28
     /// prefix so a rerun replaces only its own fixtures.

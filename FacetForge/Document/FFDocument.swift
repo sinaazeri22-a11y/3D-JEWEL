@@ -14,6 +14,20 @@ enum FFDocumentError: Error, Equatable {
     case corruptPayload(String)
 }
 
+/// A rejection a user can read. Phase 38's acceptance requires every refused
+/// document to explain itself, so the typed errors carry a sentence rather than
+/// only a case name.
+extension FFDocumentError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedSchemaVersion(let version):
+            return "this document uses schema version \(version); this app reads up to \(FFDocument.currentSchemaVersion)"
+        case .corruptPayload(let detail):
+            return "the document body is corrupt (\(detail))"
+        }
+    }
+}
+
 // MARK: - Primitive payloads
 
 /// A serialisable two-dimensional point. Kept separate from `Vec2` so the file

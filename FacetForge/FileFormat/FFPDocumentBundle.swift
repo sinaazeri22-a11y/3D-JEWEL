@@ -11,6 +11,9 @@ struct FFPBundleContent {
     /// Set when the primary bundle failed integrity checks and the last good
     /// save answered instead. `nil` for a normal open.
     var recovery: FFPRecoveryNotice? = nil
+    /// Set when the file was written by an older container revision. The
+    /// content is complete; the next save writes the current version.
+    var migration: FFPMigrationReport? = nil
 }
 
 /// Reads and writes the `.ffp` document bundle.
@@ -185,7 +188,7 @@ struct FFPDocumentBundle {
         guard fileManager.fileExists(atPath: checksumsURL.path) else {
             throw FFPFormatError.missingEntry(FFPFormat.checksumsName)
         }
-        try verifyChecksums(Data(contentsOf: checksumsURL), in: url)
+        let listed = try verifyChecksums(Data(contentsOf: checksumsURL), in: url)
 
         let manifestURL = url.appendingPathComponent(FFPFormat.manifestName)
         guard fileManager.fileExists(atPath: manifestURL.path) else {
@@ -197,6 +200,13 @@ struct FFPDocumentBundle {
         } catch {
             throw FFPFormatError.malformedManifest("manifest.json is not valid JSON")
         }
+        // Version 2's containment check comes before the body is decoded: a
+        // bundle that cannot vouch for its own manifest must not be parsed as
+        // though it could.
+        if let declaredVersion = manifest["formatVersion"]?.intValue, declaredVersion >= 2 {
+            try verifyCoverage(of: manifest, listed: listed, in: url)
+        }
+
         let decoded = try FFPManifest.read(manifest: manifest) { relativePath in
             try FFPManifest.validateRelativePath(relativePath)
             let fileURL = url.appendingPathComponent(relativePath)
@@ -221,11 +231,39 @@ struct FFPDocumentBundle {
             legacySingleFile: false,
             thumbnail: fileManager.fileExists(atPath: thumbnailURL.path)
                 ? try Data(contentsOf: thumbnailURL)
-                : nil
+                : nil,
+            migration: try FFPFormatMigration.report(from: decoded.formatVersion)
         )
     }
 
-    private func verifyChecksums(_ data: Data, in bundle: URL) throws {
+    /// Version 2's container rule: a bundle may only be trusted if every file
+    /// the app reads through the manifest is covered by a checksum. Version 1
+    /// verified the entries a file happened to list, so a manifest whose bytes
+    /// were altered and whose entry was omitted loaded silently.
+    private func verifyCoverage(
+        of manifest: FFPJSONValue,
+        listed: Set<String>,
+        in bundle: URL
+    ) throws {
+        var required: Set<String> = [FFPFormat.manifestName]
+        if fileManager.fileExists(
+            atPath: bundle.appendingPathComponent(FFPFormat.thumbnailName).path
+        ) {
+            required.insert(FFPFormat.thumbnailName)
+        }
+        for buffer in manifest["geometry"]?["buffers"]?.arrayValue ?? [] {
+            if let path = buffer["path"]?.stringValue {
+                required.insert(path)
+            }
+        }
+        if let missing = required.subtracting(listed).sorted().first {
+            throw FFPFormatError.unlistedEntry(missing)
+        }
+    }
+
+    /// Verifies every entry the list declares and returns the paths it covered.
+    @discardableResult
+    private func verifyChecksums(_ data: Data, in bundle: URL) throws -> Set<String> {
         let tree: FFPJSONValue
         do {
             tree = try FFPJSONValue.parse(data)
@@ -237,6 +275,7 @@ struct FFPDocumentBundle {
               let files = values["files"]?.arrayValue else {
             throw FFPFormatError.malformedManifest("checksums.json is not a sha256 list")
         }
+        var listed: Set<String> = []
         for entry in files {
             guard let object = entry.objectValue,
                   let path = object["path"]?.stringValue,
@@ -256,7 +295,9 @@ struct FFPDocumentBundle {
             guard FFPSHA256.hex(fileData) == sha256 else {
                 throw FFPFormatError.checksumMismatch(path)
             }
+            listed.insert(path)
         }
+        return listed
     }
 
     // MARK: - Filesystem helpers

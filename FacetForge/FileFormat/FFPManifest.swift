@@ -10,6 +10,12 @@ enum FFPFormatError: Error, Equatable {
     case missingEntry(String)
     case checksumMismatch(String)
     case unsafePath(String)
+    /// A version-2 bundle left an owned file out of `checksums.json`. Without
+    /// an entry the file's bytes are never verified, which is the one way a
+    /// document body could change without the reader noticing.
+    case unlistedEntry(String)
+    /// A version-2 geometry reference names a node the document does not have.
+    case danglingGeometryReference(String)
 }
 
 extension FFPFormatError {
@@ -20,16 +26,18 @@ extension FFPFormatError {
         switch self {
         case .unsupportedFormatVersion, .unsafePath:
             return false
-        case .malformedManifest, .corruptGeometry, .missingEntry, .checksumMismatch:
+        case .malformedManifest, .corruptGeometry, .missingEntry, .checksumMismatch,
+             .unlistedEntry, .danglingGeometryReference:
             return true
         }
     }
 
     var damagedEntry: String? {
         switch self {
-        case .missingEntry(let path), .checksumMismatch(let path):
+        case .missingEntry(let path), .checksumMismatch(let path), .unlistedEntry(let path):
             return path
-        case .malformedManifest, .corruptGeometry, .unsupportedFormatVersion, .unsafePath:
+        case .malformedManifest, .corruptGeometry, .unsupportedFormatVersion, .unsafePath,
+             .danglingGeometryReference:
             return nil
         }
     }
@@ -48,6 +56,10 @@ extension FFPFormatError {
             return "checksum mismatch for \(path)"
         case .unsafePath(let path):
             return "unsafe path \(path)"
+        case .unlistedEntry(let path):
+            return "\(path) is not listed in checksums.json"
+        case .danglingGeometryReference(let identifier):
+            return "the geometry table names node \(identifier), which the document does not contain"
         }
     }
 }
@@ -71,10 +83,16 @@ struct FFPBundlePreservation: Equatable, Sendable {
     var files: [String: Data] = [:]
 }
 
-/// The `.ffp` v1 bundle constants and the manifest codec.
+/// The `.ffp` bundle constants and the manifest codec.
 enum FFPFormat {
     static let identifier = "facetforge-document"
-    static let version = 1
+    /// The container revision this build writes.
+    ///
+    /// Version 2 tightens two reader rules that version 1 assumed: every owned
+    /// file is listed in `checksums.json`, and the geometry table resolves
+    /// one-to-one against the document. Both are container-level, so the
+    /// document model stays at schema version 1 and no state hash moves.
+    static let version = 2
     static let manifestName = "manifest.json"
     static let checksumsName = "checksums.json"
     static let thumbnailName = "preview.png"
@@ -247,11 +265,12 @@ enum FFPManifest {
     // MARK: - Read
 
     /// Reads a manifest tree and its buffers into a document plus the token
-    /// needed to preserve unknown fields on the next save.
+    /// needed to preserve unknown fields on the next save. The version is
+    /// returned so the bundle can apply that revision's container rules.
     static func read(
         manifest: FFPJSONValue,
         loadBuffer: (String) throws -> Data
-    ) throws -> (document: FFDocument, preservation: FFPBundlePreservation) {
+    ) throws -> (document: FFDocument, preservation: FFPBundlePreservation, formatVersion: Int) {
         guard let values = manifest.objectValue else {
             throw FFPFormatError.malformedManifest("manifest is not a JSON object")
         }
@@ -263,6 +282,9 @@ enum FFPManifest {
         }
         guard version <= FFPFormat.version else {
             throw FFPFormatError.unsupportedFormatVersion(version)
+        }
+        guard version >= 1 else {
+            throw FFPFormatError.malformedManifest("formatVersion \(version) is not a known revision")
         }
         guard var documentTree = values["document"] else {
             throw FFPFormatError.malformedManifest("manifest has no document")
@@ -316,7 +338,21 @@ enum FFPManifest {
                     throw FFPFormatError.corruptGeometry("geometry slice is outside its buffer")
                 }
                 let block = buffer.subdata(in: offset..<(offset + length))
-                geometryByNode[nodeID] = try FFPGeometryCodec.decode(block, expecting: kind)
+                let geometry = try FFPGeometryCodec.decode(block, expecting: kind)
+                if version >= 2, geometryByNode[nodeID] != nil {
+                    throw FFPFormatError.malformedManifest(
+                        "geometry reference for \(idString) appears twice"
+                    )
+                }
+                geometryByNode[nodeID] = geometry
+            }
+        }
+
+        if version >= 2 {
+            let nodes = nodeIdentifiers(in: documentTree)
+            for nodeID in geometryByNode.keys.sorted(by: { $0.uuidString < $1.uuidString })
+            where !nodes.contains(nodeID) {
+                throw FFPFormatError.danglingGeometryReference(nodeID.uuidString)
             }
         }
 
@@ -324,8 +360,29 @@ enum FFPManifest {
         let document = try FFDocument.decoded(from: documentTree.encoded())
         return (
             document,
-            FFPBundlePreservation(manifest: manifest, document: documentTree)
+            FFPBundlePreservation(manifest: manifest, document: documentTree),
+            version
         )
+    }
+
+    /// Every node id in a document tree. Used by the version-2 geometry rule:
+    /// a reference that no node answers would silently drop its block.
+    private static func nodeIdentifiers(in tree: FFPJSONValue) -> Set<UUID> {
+        var result: Set<UUID> = []
+        func visit(_ value: FFPJSONValue) {
+            guard case .object(let values) = value else { return }
+            if let idString = values["id"]?.stringValue,
+               let id = UUID(uuidString: idString) {
+                result.insert(id)
+            }
+            for child in values["children"]?.arrayValue ?? [] {
+                visit(child)
+            }
+        }
+        for node in tree["rootNodes"]?.arrayValue ?? [] {
+            visit(node)
+        }
+        return result
     }
 
     private static func attachingGeometry(

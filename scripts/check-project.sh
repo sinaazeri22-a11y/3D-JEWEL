@@ -49,6 +49,7 @@ required = [
     "FacetForge/FileFormat/FFPJSONValue.swift",
     "FacetForge/FileFormat/FFPGeometryCodec.swift",
     "FacetForge/FileFormat/FFPManifest.swift",
+    "FacetForge/FileFormat/FFPFormatMigration.swift",
     "FacetForge/FileFormat/FFPDocumentBundle.swift",
     "FacetForge/FileFormat/FFPThumbnail.swift",
     "FacetForge/FileFormat/FFOBJInterchange.swift",
@@ -62,6 +63,8 @@ required = [
     "FacetForge/UI/FFMetadataPanel.swift",
     "docs/format/ffp-1.0.schema.json",
     "docs/format/FFP-1.0.md",
+    "docs/format/ffp-2.0.schema.json",
+    "docs/format/FFP-2.0.md",
     "FacetForge/Render/FFMetalViewport.swift",
     "FacetForge/Render/FFSceneRendering.swift",
     "FacetForge/Render/FFDemoScene.swift",
@@ -111,6 +114,7 @@ required = [
     "FacetForgeTests/Phase35MaterialTests.swift",
     "FacetForgeTests/Phase36MetadataTests.swift",
     "FacetForgeTests/Phase37TemplateTests.swift",
+    "FacetForgeTests/Phase38FormatEvolutionTests.swift",
     "FacetForgeTests/FFPJSONSchemaValidator.swift",
     "FacetForgeUITests/LaunchTests.swift",
     "FacetForgeUITests/GalleryTests.swift",
@@ -128,6 +132,7 @@ required = [
     "FacetForgeUITests/Phase34ArrayUITests.swift",
     "FacetForgeUITests/Phase35MaterialUITests.swift",
     "FacetForgeUITests/Phase36MetadataUITests.swift",
+    "FacetForgeUITests/Phase38MigrationUITests.swift",
 ]
 for rel in required:
     if not (root / rel).exists():
@@ -242,6 +247,7 @@ if project.exists():
         "A10000000000000000000071 /* FFPJSONValue.swift in Sources */",
         "A10000000000000000000073 /* FFPGeometryCodec.swift in Sources */",
         "A10000000000000000000075 /* FFPManifest.swift in Sources */",
+        "A100000000000000000000A1 /* FFPFormatMigration.swift in Sources */",
         "A10000000000000000000077 /* FFPDocumentBundle.swift in Sources */",
         "A10000000000000000000079 /* FFPThumbnail.swift in Sources */",
         "A10000000000000000000087 /* FFOBJInterchange.swift in Sources */",
@@ -253,6 +259,7 @@ if project.exists():
         "A10000000000000000000095 /* FFArrayPanel.swift in Sources */",
         "A2000000000000000000003C /* FFPJSONSchemaValidator.swift in Sources */",
         "A2000000000000000000003E /* Phase25FileFormatTests.swift in Sources */",
+        "A2000000000000000000005B /* Phase38FormatEvolutionTests.swift in Sources */",
         "A20000000000000000000040 /* Phase26ReliabilityTests.swift in Sources */",
         "A20000000000000000000043 /* Phase27JournalTests.swift in Sources */",
         "A20000000000000000000047 /* Phase28LibraryTests.swift in Sources */",
@@ -270,6 +277,7 @@ if project.exists():
         "A3000000000000000000002D /* Phase32ObjectTreeUITests.swift in Sources */",
         "A3000000000000000000002F /* Phase33GroupUITests.swift in Sources */",
         "A30000000000000000000031 /* Phase34ArrayUITests.swift in Sources */",
+        "A30000000000000000000037 /* Phase38MigrationUITests.swift in Sources */",
         "PRODUCT_BUNDLE_IDENTIFIER = com.shahroodazerov.facetforge.tests;",
         "PRODUCT_BUNDLE_IDENTIFIER = com.shahroodazerov.facetforge.uitests;",
         'TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FacetForge.app/FacetForge";',
@@ -327,6 +335,7 @@ for rel in (
     "FacetForge/Assets.xcassets/Contents.json",
     "FacetForge/Assets.xcassets/AccentColor.colorset/Contents.json",
     "docs/format/ffp-1.0.schema.json",
+    "docs/format/ffp-2.0.schema.json",
 ):
     path = root / rel
     if path.exists():

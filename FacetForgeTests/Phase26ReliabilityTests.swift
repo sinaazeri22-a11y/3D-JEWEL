@@ -107,7 +107,7 @@ final class Phase26ReliabilityTests: XCTestCase {
         var manifest = try FFPJSONValue.parse(
             Data(contentsOf: url.appendingPathComponent("manifest.json"))
         )
-        manifest = manifest.setting("formatVersion", to: .int(2))
+        manifest = manifest.setting("formatVersion", to: .int(FFPFormat.version + 1))
         try manifest.encoded(pretty: true)
             .write(to: url.appendingPathComponent("manifest.json"))
         try FFPDocumentBundle().writeChecksums(in: url)
@@ -115,7 +115,7 @@ final class Phase26ReliabilityTests: XCTestCase {
         XCTAssertThrowsError(try store.load(from: url)) { error in
             XCTAssertEqual(
                 error as? FFPFormatError,
-                .unsupportedFormatVersion(2),
+                .unsupportedFormatVersion(FFPFormat.version + 1),
                 "a newer bundle must not be silently downgraded to the previous save"
             )
         }

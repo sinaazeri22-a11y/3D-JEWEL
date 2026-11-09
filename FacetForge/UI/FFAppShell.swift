@@ -212,6 +212,9 @@ struct FFAppShell: View {
     /// Test surface: seeds two real saved bundles so the browser suite lists
     /// only fixtures it controls. The shipping app leaves it false.
     var launchBrowserDemo: Bool = false
+    /// Test surface: seeds a version-1 bundle and opens it through the real
+    /// reader. The shipping app leaves it false.
+    var launchMigrationDemo: Bool = false
     var onOpenGallery: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
@@ -416,6 +419,9 @@ struct FFAppShell: View {
                 if launchBrowserDemo {
                     FFLaunchFixtures.prepareBrowserDocuments()
                     session.refreshLibrary()
+                }
+                if launchMigrationDemo, let url = FFLaunchFixtures.prepareMigrationDocument() {
+                    try? session.reopen(from: url)
                 }
                 session.startAutosave()
             }
