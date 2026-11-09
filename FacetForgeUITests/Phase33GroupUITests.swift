@@ -39,12 +39,23 @@ final class Phase33GroupUITests: XCTestCase {
 
         let multi = element("selection.multi", app)
         XCTAssertTrue(reveal(multi, inspector: inspector), "the Multi control is missing")
+        XCTAssertFalse(multi.isSelected, "a fresh launch must not start in Multi mode")
         multi.tap()
+        XCTAssertTrue(
+            waitFor(timeout: 10, { multi.isSelected }),
+            "the Multi chip did not turn on, so the next row tap would replace the selection"
+        )
         XCTAssertTrue(reveal(stone, inspector: inspector), "the Stone row is missing")
         stone.tap()
         XCTAssertTrue(
             waitFor(timeout: 10, { ((stone.value as? String) ?? "").contains("selected") }),
             "Multi did not extend the selection to the stone"
+        )
+        // Both rows must remain selected: the group command groups exactly the
+        // selection, so a dropped extend here would silently group one node.
+        XCTAssertTrue(
+            waitFor(timeout: 10, { ((shank.value as? String) ?? "").contains("selected") }),
+            "Multi dropped Shank when Stone was added; value='\(shank.value ?? "")'"
         )
 
         let groupChip = element("tree.groupSelection", app)
@@ -59,7 +70,7 @@ final class Phase33GroupUITests: XCTestCase {
             "the new group did not become the selection; value='\(group.value ?? "")'"
         )
         XCTAssertTrue(
-            ((group.value as? String) ?? "").contains("2 children"),
+            waitFor(timeout: 10, { ((group.value as? String) ?? "").contains("2 children") }),
             "the group did not report both children; value='\(group.value ?? "")'"
         )
 
@@ -175,19 +186,20 @@ final class Phase33GroupUITests: XCTestCase {
     /// at whichever end it reached first.
     @MainActor
     private func reveal(_ element: XCUIElement, inspector: XCUIElement) -> Bool {
-        if isHittable(element) { return true }
         // Stop at the first swipe that puts the target on screen. Scrolling to
         // an end and back overshoots, and a tap issued while the scroll is
         // still settling is how an unchanged audit starts failing intermittently.
+        // A successful reveal settles too: the chip's tap must not be read as
+        // the scroll's deceleration.
         for _ in 0..<8 {
+            if isHittable(element) { settle(); return true }
             inspector.swipeUp()
             settle()
-            if isHittable(element) { return true }
         }
         for _ in 0..<14 {
+            if isHittable(element) { settle(); return true }
             inspector.swipeDown()
             settle()
-            if isHittable(element) { return true }
         }
         return isHittable(element)
     }
