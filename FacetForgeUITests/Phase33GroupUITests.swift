@@ -191,12 +191,12 @@ final class Phase33GroupUITests: XCTestCase {
         // still settling is how an unchanged audit starts failing intermittently.
         // A successful reveal settles too: the chip's tap must not be read as
         // the scroll's deceleration.
-        for _ in 0..<8 {
+        for _ in 0..<16 {
             if isVisible(element, in: inspector) { settle(); return true }
             scroll(inspector, up: true)
             settle()
         }
-        for _ in 0..<14 {
+        for _ in 0..<24 {
             if isVisible(element, in: inspector) { settle(); return true }
             scroll(inspector, up: false)
             settle()
@@ -227,11 +227,13 @@ final class Phase33GroupUITests: XCTestCase {
     /// start at 85% of the column is inside that panel and scrolls nothing.
     @MainActor
     private func scroll(_ inspector: XCUIElement, up: Bool) {
+        // A short step (about 275 pt) so a check lands inside each panel rather
+        // than jumping over a 300 pt section between two long swipes.
         let start = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.55 : 0.20)
+            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.45 : 0.25)
         )
         let end = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.15 : 0.60)
+            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.25 : 0.45)
         )
         start.press(forDuration: 0.05, thenDragTo: end)
     }
