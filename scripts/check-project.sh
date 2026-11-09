@@ -54,8 +54,11 @@ required = [
     "FacetForge/FileFormat/FFOBJInterchange.swift",
     "FacetForge/Document/FFGrouping.swift",
     "FacetForge/Document/FFArrays.swift",
+    "FacetForge/Document/FFMetadata.swift",
     "FacetForge/UI/FFTransformPanel.swift",
     "FacetForge/UI/FFArrayPanel.swift",
+    "FacetForge/UI/FFMaterialPanel.swift",
+    "FacetForge/UI/FFMetadataPanel.swift",
     "docs/format/ffp-1.0.schema.json",
     "docs/format/FFP-1.0.md",
     "FacetForge/Render/FFMetalViewport.swift",
@@ -104,6 +107,8 @@ required = [
     "FacetForgeTests/Phase32ObjectTreeTests.swift",
     "FacetForgeTests/Phase33GroupingTests.swift",
     "FacetForgeTests/Phase34ArrayTests.swift",
+    "FacetForgeTests/Phase35MaterialTests.swift",
+    "FacetForgeTests/Phase36MetadataTests.swift",
     "FacetForgeTests/FFPJSONSchemaValidator.swift",
     "FacetForgeUITests/LaunchTests.swift",
     "FacetForgeUITests/GalleryTests.swift",
@@ -119,6 +124,8 @@ required = [
     "FacetForgeUITests/Phase32ObjectTreeUITests.swift",
     "FacetForgeUITests/Phase33GroupUITests.swift",
     "FacetForgeUITests/Phase34ArrayUITests.swift",
+    "FacetForgeUITests/Phase35MaterialUITests.swift",
+    "FacetForgeUITests/Phase36MetadataUITests.swift",
 ]
 for rel in required:
     if not (root / rel).exists():

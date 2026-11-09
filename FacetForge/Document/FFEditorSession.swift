@@ -54,6 +54,13 @@ final class FFEditorSession: ObservableObject {
     /// the same owner as layers and display modes; the measurement tool keeps
     /// only its draft points.
     @Published private(set) var measurements: [FFMeasurement]
+    /// Phase 36's production paperwork. It is document state with this same
+    /// owner; the panel only edits drafts and never keeps a copy that could
+    /// disagree with the file.
+    @Published private(set) var metadata = FFMetadata()
+    /// Stones derived from the node tree in display order. Published with the
+    /// metadata because both are rendered by the same sheet.
+    @Published private(set) var stoneSummary = FFStoneSummary(stones: [])
     /// The last document command, shown in the app bar so a smoke run can read
     /// back that save and reopen actually happened.
     @Published private(set) var documentStatus: String
@@ -121,6 +128,8 @@ final class FFEditorSession: ObservableObject {
         self.layerSets = initial.layerSets
         self.activeLayerSetID = initial.activeLayerSetID
         self.measurements = initial.measurements.map(\.measurement)
+        self.metadata = initial.resolvedMetadata
+        self.stoneSummary = initial.stoneSummary()
         self.documentStatus = initial.name
         self.recoveryMessage = nil
         self.documentURL = documentURL
@@ -933,6 +942,40 @@ final class FFEditorSession: ObservableObject {
         return created
     }
 
+    /// One metadata text edit. Text arrives per keystroke, so the field's own
+    /// coalescing key keeps a whole typing session as one undo step; a value
+    /// that did not change records nothing.
+    @discardableResult
+    func setMetadataField(_ field: FFMetadataField, value: String) -> Bool {
+        guard documentSession.document.resolvedMetadata.value(for: field) != value else {
+            return false
+        }
+        let changed = documentSession.perform(
+            field.label,
+            coalescingKey: "metadata-\(field.rawValue)"
+        ) { document in
+            _ = document.setMetadataField(field, value: value)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(field.label) updated"
+        return true
+    }
+
+    /// A manufacturing flag is one deliberate decision, so it is its own undo
+    /// step rather than part of a typing coalesce.
+    @discardableResult
+    func toggleManufacturingFlag(_ flag: FFManufacturingFlag) -> Bool {
+        let enabled = !documentSession.document.resolvedMetadata.isFlagEnabled(flag)
+        let changed = documentSession.perform("Manufacturing · \(flag.label)") { document in
+            _ = document.setManufacturingFlag(flag, enabled: enabled)
+        }
+        guard changed else { return false }
+        syncDocumentState()
+        documentStatus = "\(flag.label) \(enabled ? "on" : "off")"
+        return true
+    }
+
     /// Rebuilds every published value that is derived from the document. The
     /// document session remains the only owner; this is the projection the
     /// shell renders.
@@ -946,6 +989,8 @@ final class FFEditorSession: ObservableObject {
         layerSets = document.layerSets
         activeLayerSetID = document.activeLayerSetID
         measurements = document.measurements.map(\.measurement)
+        metadata = document.resolvedMetadata
+        stoneSummary = document.stoneSummary()
         if !isLoading {
             noteEdit()
         }

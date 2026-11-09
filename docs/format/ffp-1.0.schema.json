@@ -70,13 +70,38 @@
           "items": { "$ref": "#/$defs/layer" }
         },
         "currentLayerID": { "$ref": "#/$defs/uuid" },
-        "measurements": { "type": "array" }
+        "measurements": { "type": "array" },
+        "metadata": { "$ref": "#/$defs/metadata" }
       },
       "additionalProperties": true
     },
     "uuid": {
       "type": "string",
       "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "partNumber": { "type": "string" },
+        "sku": { "type": "string" },
+        "description": { "type": "string" },
+        "workshopNotes": { "type": "string" },
+        "manufacturingFlags": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/manufacturingFlag" },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "manufacturingFlag": {
+      "enum": [
+        "casting",
+        "stone-setting",
+        "hand-engraving",
+        "rhodium-plating",
+        "laser-welding"
+      ]
     },
     "faceGroup": {
       "type": "object",

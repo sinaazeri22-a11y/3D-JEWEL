@@ -325,6 +325,10 @@ struct FFAppShell: View {
                             transformInfo: session.transformInfo(),
                             arrayInfo: session.arrayInfo(),
                             materialInfo: session.materialInfo(),
+                            metadata: session.metadata,
+                            stoneSummary: session.stoneSummary,
+                            onSetMetadataField: { session.setMetadataField($0, value: $1) },
+                            onToggleManufacturingFlag: { session.toggleManufacturingFlag($0) },
                             onSetMaterialPreset: { session.setMaterialPreset($0, preset: $1) },
                             onAdjustMaterialMetallic: { session.adjustMaterialMetallic($0, by: $1) },
                             onAdjustMaterialRoughness: { session.adjustMaterialRoughness($0, by: $1) },
@@ -1298,6 +1302,10 @@ private struct FFInspector: View {
     let transformInfo: FFTransformInfo?
     let arrayInfo: FFArrayInfo?
     let materialInfo: FFMaterialInfo
+    let metadata: FFMetadata
+    let stoneSummary: FFStoneSummary
+    let onSetMetadataField: (FFMetadataField, String) -> Void
+    let onToggleManufacturingFlag: (FFManufacturingFlag) -> Void
     let onSetMaterialPreset: (UUID, FFAlloyPreset) -> Void
     let onAdjustMaterialMetallic: (UUID, Double) -> Void
     let onAdjustMaterialRoughness: (UUID, Double) -> Void
@@ -1421,6 +1429,13 @@ private struct FFInspector: View {
                         .foregroundStyle(FFPalette.textPrimary.color)
 
                     Spacer(minLength: 0)
+
+                    FFMetadataInspectorLauncher(
+                        metadata: metadata,
+                        stones: stoneSummary,
+                        onSetField: onSetMetadataField,
+                        onToggleFlag: onToggleManufacturingFlag
+                    )
 
                     FFMaterialInspectorLauncher(
                         info: materialInfo,

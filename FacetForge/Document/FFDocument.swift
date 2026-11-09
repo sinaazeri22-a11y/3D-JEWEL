@@ -478,6 +478,7 @@ struct FFDocument: Codable, Equatable, Sendable {
         case layerSets
         case activeLayerSetID
         case measurements
+        case metadata
     }
 
     var schemaVersion: Int
@@ -504,6 +505,10 @@ struct FFDocument: Codable, Equatable, Sendable {
     /// step and survives save and reopen. Additive in schema 1: a file written
     /// before this field decodes to no annotations.
     var measurements: [FFMeasurementAnnotation]
+    /// Phase 36's production paperwork. Optional so schema-1 documents written
+    /// before this field still decode; encoding omits it while nil, so an
+    /// untouched document's canonical hash does not move.
+    var metadata: FFMetadata?
 
     init(
         name: String = "Untitled",
@@ -515,7 +520,8 @@ struct FFDocument: Codable, Equatable, Sendable {
         currentLayerID: UUID? = nil,
         layerSets: [FFLayerSet] = [],
         activeLayerSetID: UUID? = nil,
-        measurements: [FFMeasurementAnnotation] = []
+        measurements: [FFMeasurementAnnotation] = [],
+        metadata: FFMetadata? = nil
     ) {
         self.schemaVersion = Self.currentSchemaVersion
         self.name = name
@@ -533,6 +539,7 @@ struct FFDocument: Codable, Equatable, Sendable {
             ? activeLayerSetID
             : resolvedSets.first?.id
         self.measurements = measurements
+        self.metadata = metadata
     }
 
     init(from decoder: Decoder) throws {
@@ -566,6 +573,7 @@ struct FFDocument: Codable, Equatable, Sendable {
             [FFMeasurementAnnotation].self,
             forKey: .measurements
         ) ?? []
+        self.metadata = try container.decodeIfPresent(FFMetadata.self, forKey: .metadata)
     }
 
     var nodeCount: Int {
