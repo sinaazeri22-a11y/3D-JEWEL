@@ -575,12 +575,18 @@ final class Phase38FormatEvolutionTests: XCTestCase {
         return current
     }
 
+    /// Collects every addressable child of the document. The root is excluded
+    /// on purpose: a `.ffp` document member is always an object, and replacing
+    /// the root with a scalar would test the JSON writer rather than the
+    /// reader. Every meaningful mutation lives below the root.
     private func collectPaths(
         in value: FFPJSONValue,
         prefix: [PathStep] = [],
         into result: inout [[PathStep]]
     ) {
-        result.append(prefix)
+        if !prefix.isEmpty {
+            result.append(prefix)
+        }
         switch value {
         case .object(let values):
             // Sorted keys keep the corpus reproducible: Swift dictionary order
