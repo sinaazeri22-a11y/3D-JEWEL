@@ -233,6 +233,7 @@ struct FFAppShell: View {
     private let tools: [FFTool] = [
         FFTool(id: "select", systemImage: "cursorarrow", label: "Select"),
         FFTool(id: "sketch", systemImage: "scribble", label: "Sketch"),
+        FFTool(id: "line", systemImage: "line.diagonal", label: "Line chain"),
         FFTool(id: "gem", systemImage: "diamond", label: "Gem"),
         FFTool(id: "measure", systemImage: "ruler", label: "Measure"),
         FFTool(id: "render", systemImage: "camera", label: "Render"),
@@ -290,6 +291,16 @@ struct FFAppShell: View {
                         lockedNodeIDs: session.lockedNodeIDs,
                         selection: $session.selection,
                         measurements: session.measurements,
+                        curveNodes: session.curveNodes,
+                        lineDraft: session.lineChainDraft,
+                        lineReadout: session.lineChainReadout,
+                        lineMessage: session.lineToolMessage,
+                        onLineTap: { session.tapLineChain(at: $0) },
+                        onLinePreview: { session.previewLineChain(at: $0) },
+                        onLineTypeLength: { session.typeLineChainLength($0, unit: lengthUnit) },
+                        onLineClose: { session.closeLineChain() },
+                        onLineFinish: { session.finishLineChain() },
+                        onLineCancel: { session.cancelLineChain() },
                         onCommitMeasurement: { session.addMeasurement($0) },
                         onClearMeasurements: { session.clearMeasurements() },
                         onCommitGizmoTransform: { nodeID, transform, key in
@@ -639,6 +650,18 @@ private struct FFViewport: View {
     let lockedNodeIDs: Set<UUID>
     @Binding var selection: FFSelectionState
     let measurements: [FFMeasurement]
+    /// Phase 39: committed sketch curves in world space, the live chain and the
+    /// tool's card. All of it is session state; this view only draws and routes.
+    let curveNodes: [FFCurveRender]
+    let lineDraft: FFLineChainDraft
+    let lineReadout: FFLineSegmentMeasure?
+    let lineMessage: String?
+    let onLineTap: (Vec2?) -> Void
+    let onLinePreview: (Vec2) -> Void
+    let onLineTypeLength: (String) -> Void
+    let onLineClose: () -> Void
+    let onLineFinish: () -> Void
+    let onLineCancel: () -> Void
     let onCommitMeasurement: (FFMeasurement) -> Void
     let onClearMeasurements: () -> Void
     let onCommitGizmoTransform: (UUID, Mat4, String) -> Void
@@ -659,6 +682,8 @@ private struct FFViewport: View {
     @State private var showsPerformanceOverlay = false
 
     private var isMeasuring: Bool { selectedTool == "measure" }
+
+    private var isDrawingLines: Bool { selectedTool == "line" }
 
     private var scaleBarPlan: FFScaleBarPlan? {
         guard let units = camera.worldUnitsPerPoint(
@@ -849,6 +874,13 @@ private struct FFViewport: View {
             viewportSize = size
         }
         .clipped()
+        .onChange(of: selectedTool) { _, tool in
+            // An unfinished chain belongs to the Line tool. Switching away
+            // abandons it through the session so no invisible draft lingers.
+            if tool != "line" {
+                onLineCancel()
+            }
+        }
     }
 
     @ViewBuilder
@@ -865,11 +897,22 @@ private struct FFViewport: View {
                     selection: $selection,
                     measurement: measurement,
                     measurements: measurements,
+                    curveNodes: curveNodes,
+                    lineDraft: lineDraft,
+                    lineReadout: lineReadout,
+                    lineMessage: lineMessage,
+                    onLineTap: onLineTap,
+                    onLinePreview: onLinePreview,
+                    onLineTypeLength: onLineTypeLength,
+                    onLineClose: onLineClose,
+                    onLineFinish: onLineFinish,
+                    onLineCancel: onLineCancel,
                     onCommitMeasurement: onCommitMeasurement,
                     onClearMeasurements: onClearMeasurements,
                     onCommitGizmoTransform: onCommitGizmoTransform,
                     onUndoEdit: onUndoEdit,
                     isMeasuring: isMeasuring,
+                    isDrawingLines: isDrawingLines,
                     unit: lengthUnit,
                     metalIdentifier: "shell.viewport.metal",
                     onCycleDisplayMode: { onCycleDisplayMode(pane.id) },
@@ -927,13 +970,24 @@ private struct FFViewport: View {
             selection: $selection,
             measurement: measurement,
             measurements: measurements,
+            curveNodes: curveNodes,
+            lineDraft: lineDraft,
+            lineReadout: lineReadout,
+            lineMessage: lineMessage,
+            onLineTap: onLineTap,
+            onLinePreview: onLinePreview,
+            onLineTypeLength: onLineTypeLength,
+            onLineClose: onLineClose,
+            onLineFinish: onLineFinish,
+            onLineCancel: onLineCancel,
             onCommitMeasurement: onCommitMeasurement,
             onClearMeasurements: onClearMeasurements,
             onCommitGizmoTransform: onCommitGizmoTransform,
             onUndoEdit: onUndoEdit,
-            // The four-up panes are camera previews; measuring happens in the
-            // maximised Perspective pane that a document opens in.
+            // The four-up panes are camera previews; measuring and sketching
+            // happen in the maximised Perspective pane a document opens in.
             isMeasuring: false,
+            isDrawingLines: false,
             unit: lengthUnit,
             metalIdentifier: "shell.viewport.metal.\(pane.id)",
             onCycleDisplayMode: { onCycleDisplayMode(pane.id) },
@@ -989,11 +1043,22 @@ private struct FFViewportPane: View {
     @Binding var selection: FFSelectionState
     @ObservedObject var measurement: FFMeasurementSession
     let measurements: [FFMeasurement]
+    let curveNodes: [FFCurveRender]
+    let lineDraft: FFLineChainDraft
+    let lineReadout: FFLineSegmentMeasure?
+    let lineMessage: String?
+    let onLineTap: (Vec2?) -> Void
+    let onLinePreview: (Vec2) -> Void
+    let onLineTypeLength: (String) -> Void
+    let onLineClose: () -> Void
+    let onLineFinish: () -> Void
+    let onLineCancel: () -> Void
     let onCommitMeasurement: (FFMeasurement) -> Void
     let onClearMeasurements: () -> Void
     let onCommitGizmoTransform: (UUID, Mat4, String) -> Void
     let onUndoEdit: () -> Void
     let isMeasuring: Bool
+    let isDrawingLines: Bool
     let unit: FFLengthUnit
     let metalIdentifier: String
     let onCycleDisplayMode: () -> Void
@@ -1078,6 +1143,12 @@ private struct FFViewportPane: View {
                         onCameraChange(updated)
                     },
                     onPick: { result in
+                        if isDrawingLines {
+                            // The Line tool turns a tap into a sketch-plane
+                            // vertex; the pick itself is not a selection.
+                            addLinePoint()
+                            return
+                        }
                         if isMeasuring {
                             // While the Measure tool is selected a tap is a
                             // point, not a selection. The pick is ignored so a
@@ -1097,6 +1168,16 @@ private struct FFViewportPane: View {
                 )
 
                 FFSnapOverlay(markers: snapMarkers)
+
+                if showsGumball, !curveNodes.isEmpty || lineDraft.isActive {
+                    FFLineChainOverlay(
+                        curves: curveNodes,
+                        draft: lineDraft,
+                        camera: camera,
+                        viewport: proxy.size,
+                        unit: unit
+                    )
+                }
 
                 if showsGumball, isMeasuring {
                     FFMeasurementOverlay(
@@ -1160,6 +1241,20 @@ private struct FFViewportPane: View {
             // The card names the kinds and shows the live value. It sits above
             // the HUD strip so the value is readable while tapping.
             .overlay(alignment: .bottomLeading) {
+                if showsGumball, isDrawingLines {
+                    FFLineChainPanel(
+                        draft: lineDraft,
+                        readout: lineReadout,
+                        unit: unit,
+                        message: lineMessage,
+                        onTypeLength: onLineTypeLength,
+                        onClose: onLineClose,
+                        onFinish: onLineFinish,
+                        onCancel: onLineCancel
+                    )
+                    .padding(.leading, FFSpace.sm)
+                    .padding(.bottom, 72)
+                }
                 if showsGumball, isMeasuring {
                     FFMeasurementPanel(
                         session: measurement,
@@ -1273,7 +1368,42 @@ private struct FFViewportPane: View {
 
     private func updateHover(_ point: Vec2?, viewport: CGSize) {
         hoverPoint = point
+        if isDrawingLines,
+           lineDraft.isActive,
+           !lineDraft.isClosed,
+           let point,
+           viewport.width > 1,
+           viewport.height > 1,
+           let resolved = FFLineChainPlacement.point(
+               at: point,
+               scene: displayScene,
+               camera: camera,
+               viewport: Vec2(x: Double(viewport.width), y: Double(viewport.height)),
+               draftPoints: lineDraft.points
+           ) {
+            // The pointer sets the direction typing will use; the session keeps
+            // the pending point, this pane never does.
+            onLinePreview(resolved)
+        }
         refreshSnapMarkers(viewport: viewport)
+    }
+
+    /// Places a tapped vertex. The same snap-or-plane resolution the hover uses
+    /// decides where the point lands, so a tap and the rubber band agree.
+    private func addLinePoint() {
+        guard let tap = measureTap.point, paneSize.width > 1, paneSize.height > 1 else {
+            onLineTap(nil)
+            return
+        }
+        let resolved = FFLineChainPlacement.point(
+            at: tap,
+            scene: displayScene,
+            camera: camera,
+            viewport: Vec2(x: Double(paneSize.width), y: Double(paneSize.height)),
+            draftPoints: lineDraft.points
+        )
+        onLineTap(resolved)
+        refreshSnapMarkers(viewport: paneSize)
     }
 
     private func refreshSnapMarkers(viewport: CGSize) {

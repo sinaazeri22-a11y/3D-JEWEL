@@ -54,6 +54,16 @@ final class FFEditorSession: ObservableObject {
     /// the same owner as layers and display modes; the measurement tool keeps
     /// only its draft points.
     @Published private(set) var measurements: [FFMeasurement]
+    /// Phase 39's live line chain. The draft is transient tool state; the
+    /// committed chain is an ordinary curve node, so undo, the journal and
+    /// autosave need no special case. The draft never reaches the document.
+    @Published private(set) var lineChainDraft = FFLineChainDraft()
+    /// The last line-tool hint or refusal, shown beside the typed length field
+    /// so a rejected command explains itself instead of doing nothing.
+    @Published private(set) var lineToolMessage: String?
+    /// Curve nodes projected into world space for the viewport overlay. The
+    /// session owns the projection; the view only draws it.
+    @Published private(set) var curveNodes: [FFCurveRender] = []
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -132,6 +142,7 @@ final class FFEditorSession: ObservableObject {
         self.layerSets = initial.layerSets
         self.activeLayerSetID = initial.activeLayerSetID
         self.measurements = initial.measurements.map(\.measurement)
+        self.curveNodes = initial.curveRenders()
         self.metadata = initial.resolvedMetadata
         self.stoneSummary = initial.stoneSummary()
         self.documentStatus = initial.name
@@ -994,6 +1005,7 @@ final class FFEditorSession: ObservableObject {
         layerSets = document.layerSets
         activeLayerSetID = document.activeLayerSetID
         measurements = document.measurements.map(\.measurement)
+        curveNodes = document.curveRenders()
         metadata = document.resolvedMetadata
         stoneSummary = document.stoneSummary()
         if !isLoading {
@@ -1018,6 +1030,7 @@ final class FFEditorSession: ObservableObject {
         preservation = nil
         recoveryMessage = nil
         migrationReport = nil
+        cancelLineChain()
         isDirty = false
         autosaveMessage = nil
         documentStatus = "New document"
@@ -1037,6 +1050,7 @@ final class FFEditorSession: ObservableObject {
         preservation = nil
         recoveryMessage = nil
         migrationReport = nil
+        cancelLineChain()
         isDirty = false
         autosaveMessage = nil
         documentStatus = "Fixture loaded"
@@ -1135,6 +1149,142 @@ final class FFEditorSession: ObservableObject {
         syncDocumentState()
         documentStatus = "Measurements cleared"
         return true
+    }
+
+    // MARK: - Line chain tool
+
+    /// The live segment readout: length and angle from the last vertex to the
+    /// pending point. `nil` until a direction exists.
+    var lineChainReadout: FFLineSegmentMeasure? { lineChainDraft.pendingMeasure }
+
+    /// Starts a chain at a sketch-plane point. Starting again replaces an
+    /// unfinished chain rather than silently joining two unrelated ones.
+    func beginLineChain(at point: Vec2) {
+        lineChainDraft.begin(at: point)
+        lineToolMessage = nil
+    }
+
+    /// Moves the rubber-band point. This changes only tool state, never the
+    /// document, so hovering or dragging cannot create an undo step.
+    func previewLineChain(at point: Vec2) {
+        guard lineChainDraft.isActive, !lineChainDraft.isClosed else { return }
+        lineChainDraft.preview(to: point)
+    }
+
+    /// A viewport tap, already resolved to the sketch plane. `nil` means the
+    /// tap met neither geometry nor the plane; that is a refusal with a
+    /// sentence, not a silently dropped touch.
+    @discardableResult
+    func tapLineChain(at point: Vec2?) -> Bool {
+        guard let point else {
+            lineToolMessage = "That tap meets neither geometry nor the sketch plane"
+            return false
+        }
+        return addLineChainPoint(at: point)
+    }
+
+    /// Commits one tapped point. A tap on the first vertex closes the chain
+    /// instead of adding a duplicate; returns whether it closed.
+    @discardableResult
+    func addLineChainPoint(at point: Vec2) -> Bool {
+        guard lineChainDraft.isActive else {
+            beginLineChain(at: point)
+            return false
+        }
+        lineChainDraft.preview(to: point)
+        do {
+            let closed = try lineChainDraft.commitPending()
+            lineToolMessage = closed ? "Closed chain · press Finish" : nil
+            return closed
+        } catch {
+            lineToolMessage = Self.lineMessage(for: error)
+            return false
+        }
+    }
+
+    /// Typed length entry: the pending direction decides the bearing, the typed
+    /// number decides the distance, so a dimension never depends on pointer
+    /// accuracy. The value arrives in the document's display unit and is
+    /// stored in millimetres.
+    @discardableResult
+    func typeLineChainLength(_ text: String, unit: FFLengthUnit) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Double(trimmed), value.isFinite else {
+            lineToolMessage = FFLineChainError.invalidLength(trimmed).errorDescription
+            return false
+        }
+        do {
+            _ = try lineChainDraft.commitTypedLength(unit.millimetres(from: value))
+            lineToolMessage = nil
+            return true
+        } catch {
+            lineToolMessage = Self.lineMessage(for: error)
+            return false
+        }
+    }
+
+    /// Closes the chain geometrically, from the last vertex back to the first.
+    @discardableResult
+    func closeLineChain() -> Bool {
+        do {
+            try lineChainDraft.close()
+            lineToolMessage = "Closed chain · press Finish"
+            return true
+        } catch {
+            lineToolMessage = Self.lineMessage(for: error)
+            return false
+        }
+    }
+
+    /// Commits the draft as one curve node. One `perform` means one undo step
+    /// and the same journal and autosave path as every other edit.
+    @discardableResult
+    func finishLineChain() -> Bool {
+        guard lineChainDraft.isActive else {
+            lineToolMessage = "Start a chain by tapping the sketch plane"
+            return false
+        }
+        do {
+            let payload = try lineChainDraft.payload()
+            let name = nextCurveName()
+            let segmentCount = payload.segments.count
+            let changed = documentSession.perform("Line chain") { document in
+                document.rootNodes.append(FFNode(
+                    name: name,
+                    geometry: .curve(payload),
+                    kind: .curve,
+                    layerID: document.currentLayerID
+                ))
+            }
+            guard changed else { return false }
+            lineChainDraft.cancel()
+            lineToolMessage = nil
+            syncDocumentState()
+            documentStatus = payload.isClosed
+                ? "Line chain · \(segmentCount) segments · closed"
+                : "Line chain · \(segmentCount) segments"
+            return true
+        } catch {
+            lineToolMessage = Self.lineMessage(for: error)
+            return false
+        }
+    }
+
+    func cancelLineChain() {
+        lineChainDraft.cancel()
+        lineToolMessage = nil
+    }
+
+    private static func lineMessage(for error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+    }
+
+    private func nextCurveName() -> String {
+        let names = documentSession.document.curveNodeNames()
+        guard names.contains("Line chain") else { return "Line chain" }
+        var index = 2
+        while names.contains("Line chain \(index)") { index += 1 }
+        return "Line chain \(index)"
     }
 
     // MARK: - Interchange
@@ -1283,6 +1433,7 @@ final class FFEditorSession: ObservableObject {
         preservation = loaded.preservation
         recoveryMessage = loaded.recovery?.message
         migrationReport = loaded.migration
+        cancelLineChain()
         selection = FFSelectionState.initial(for: scene)
         isDirty = false
         lastAutosaveAt = nil
