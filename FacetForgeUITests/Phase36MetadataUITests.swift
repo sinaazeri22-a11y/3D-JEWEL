@@ -18,7 +18,7 @@ final class Phase36MetadataUITests: XCTestCase {
     func testMetadataSheetEditsPartNumberAndFlagWithOneUndo() throws {
         let app = launch()
         let sheet = element("metadata.sheet", app)
-        let partNumber = element("metadata.partNumber", app)
+        let partNumber = element("metadata.field.partNumber", app)
         let stoneSetting = element("metadata.flag.stone-setting", app)
         let done = element("metadata.done", app)
 
