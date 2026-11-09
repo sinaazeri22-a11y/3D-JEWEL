@@ -47,13 +47,13 @@ final class Phase35MaterialUITests: XCTestCase {
         expect(10, "the sheet did not name the selected object", app: app) { node.exists }
         XCTAssertTrue(node.label.contains("Shank"), "the sheet named the wrong object: '\(node.label)'")
         XCTAssertTrue(
-            node.label.contains("6720 faces"),
+            node.label.contains("6,720 faces"),
             "the shank's face count is wrong: '\(node.label)'"
         )
 
         let usage = element("material.usage", app)
         expect(10, "the material usage line is missing", app: app) { usage.exists }
-        XCTAssertTrue(usage.label.contains("6720 faces"), "usage='\(usage.label)'")
+        XCTAssertTrue(usage.label.contains("6,720 faces"), "usage='\(usage.label)'")
 
         // A preset edit is a real document change even from a custom surface.
         let gold = element("material.preset.yellow-gold-18k", app)
