@@ -1035,6 +1035,40 @@ final class FFEditorSession: ObservableObject {
         documentStatus = "Fixture loaded"
     }
 
+    /// Starts a document from one of the Phase 37 templates.
+    ///
+    /// The template is written to a real `.ffp` bundle and then opened through
+    /// the normal reader, so nothing downstream needs a template branch: the
+    /// new document has a file, a thumbnail, a bundle checksum list and an
+    /// empty undo history from the moment it appears. An existing name is never
+    /// overwritten; a second copy is numbered like a duplicate.
+    @discardableResult
+    func createDocument(from template: FFDocumentTemplate) throws -> URL {
+        let directory = libraryDirectory
+        let fileManager = FileManager.default
+        var target = directory
+            .appendingPathComponent(template.fileBaseName)
+            .appendingPathExtension("ffp")
+        var index = 2
+        while fileManager.fileExists(atPath: target.path) {
+            target = directory
+                .appendingPathComponent("\(template.fileBaseName) \(index)")
+                .appendingPathExtension("ffp")
+            index += 1
+        }
+
+        let document = template.makeDocument()
+        try store.save(
+            document,
+            to: target,
+            thumbnail: FFPThumbnail.png(for: document)
+        )
+        try reopen(from: target)
+        refreshLibrary()
+        documentStatus = "New \(template.title)"
+        return target
+    }
+
     /// Commits one gizmo interaction. The gizmo reports its world matrix when
     /// the drag ends; this converts it to the node's local transform, writes it
     /// through the document session and rebuilds the scene. `dragKey` is unique

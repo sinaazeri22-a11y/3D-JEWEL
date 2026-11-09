@@ -92,6 +92,23 @@ struct FFDocumentBrowserView: View {
                     .foregroundStyle(FFPalette.textTertiary.color)
             }
             Spacer(minLength: 0)
+            Menu {
+                ForEach(FFDocumentTemplate.allCases) { template in
+                    Button {
+                        createDocument(from: template)
+                    } label: {
+                        Text("\(template.title) · \(template.summary)")
+                    }
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(FFPalette.textSecondary.color)
+                    .frame(width: FFHitTarget.minimum, height: FFHitTarget.minimum)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityIdentifier("shell.browser.template")
+            .accessibilityLabel("New from template")
             Button(action: onClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .semibold))
@@ -344,6 +361,18 @@ struct FFDocumentBrowserView: View {
             onClose()
         } catch {
             message = "Could not open: \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)"
+        }
+    }
+
+    /// Writes the chosen template as a real bundle in the library folder and
+    /// opens it. The session owns the file and the open; the browser only picks
+    /// which template and dismisses itself on success.
+    private func createDocument(from template: FFDocumentTemplate) {
+        do {
+            try session.createDocument(from: template)
+            onClose()
+        } catch {
+            message = "Could not create: \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)"
         }
     }
 
