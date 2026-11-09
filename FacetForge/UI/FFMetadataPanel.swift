@@ -51,6 +51,7 @@ struct FFMetadataInspectorSheet: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("metadata.sheet")
         .presentationDetents([.large])
+        .onDisappear { commitDrafts() }
     }
 
     private var header: some View {
@@ -67,6 +68,7 @@ struct FFMetadataInspectorSheet: View {
             Spacer(minLength: 0)
 
             Button("Done") {
+                commitDrafts()
                 dismiss()
             }
             .font(FFType.label)
@@ -194,6 +196,20 @@ struct FFMetadataInspectorSheet: View {
         }
     }
 
+    // MARK: - Commands
+
+    /// Drafts stay local while the user types. A per-keystroke commit rebuilt
+    /// the shell and the sheet on every character and could swallow the rest of
+    /// a typed value, so the sheet commits once when it closes, whether that is
+    /// Done or a swipe, and again on the keyboard's Done. The session's field
+    /// coalescing still makes the whole edit one undo step.
+    private func commitDrafts() {
+        onSetField(.partNumber, partNumber)
+        onSetField(.sku, sku)
+        onSetField(.itemDescription, itemDescription)
+        onSetField(.workshopNotes, workshopNotes)
+    }
+
     // MARK: - Fields
 
     @ViewBuilder
@@ -227,9 +243,7 @@ struct FFMetadataInspectorSheet: View {
                         .stroke(FFPalette.separator.color, lineWidth: 1)
                 }
                 .accessibilityIdentifier(field.accessibilityIdentifier)
-                .onChange(of: text.wrappedValue) { _, newValue in
-                    onSetField(field, newValue)
-                }
+                .onSubmit { commitDrafts() }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

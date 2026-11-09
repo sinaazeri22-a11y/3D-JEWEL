@@ -42,7 +42,9 @@ final class Phase36MetadataUITests: XCTestCase {
         XCTAssertTrue(partNumber.isHittable, "the part-number field is not hittable")
         partNumber.tap()
         partNumber.typeText("FF-1042")
-        XCTAssertEqual(partNumber.value as? String, "FF-1042")
+        expect(5, "the typed part number did not reach the field", app: app) {
+            (partNumber.value as? String) == "FF-1042"
+        }
 
         assertOnScreen(done, "the sheet's Done control is missing", app: app)
         done.tap()
