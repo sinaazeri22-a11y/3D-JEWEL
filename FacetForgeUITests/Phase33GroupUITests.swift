@@ -211,21 +211,27 @@ final class Phase33GroupUITests: XCTestCase {
     @MainActor
     private func isVisible(_ element: XCUIElement, in inspector: XCUIElement) -> Bool {
         guard element.exists, element.isHittable else { return false }
+        // The pinned array panel overlays the bottom of the column. `isHittable`
+        // still reports elements beneath it, so the visible bottom is its top.
+        let pinned = inspector.descendants(matching: .any)["array.panel"]
         let bounds = inspector.frame.insetBy(dx: 0, dy: 4)
+        let bottom = pinned.exists ? min(bounds.maxY, pinned.frame.minY) : bounds.maxY
         let frame = element.frame
-        return frame.minY >= bounds.minY && frame.maxY <= bounds.maxY
+        return frame.minY >= bounds.minY && frame.maxY <= bottom
     }
 
     /// Scrolls from the inspector's outer gutter. A swipe in the middle lands
     /// on an object-tree row, whose long-press-drag gesture never yields to the
     /// scroll view, so a reveal from the centre can leave the view where it was.
+    /// The drag must also stay above the inspector's pinned array panel: a
+    /// start at 85% of the column is inside that panel and scrolls nothing.
     @MainActor
     private func scroll(_ inspector: XCUIElement, up: Bool) {
         let start = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.85 : 0.15)
+            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.55 : 0.20)
         )
         let end = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.15 : 0.85)
+            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.15 : 0.60)
         )
         start.press(forDuration: 0.05, thenDragTo: end)
     }
