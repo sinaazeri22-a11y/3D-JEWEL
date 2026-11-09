@@ -191,14 +191,15 @@ final class Phase33GroupUITests: XCTestCase {
         // still settling is how an unchanged audit starts failing intermittently.
         // A successful reveal settles too: the chip's tap must not be read as
         // the scroll's deceleration.
-        for _ in 0..<16 {
+        for _ in 0..<28 {
             if isVisible(element, in: inspector) { settle(); return true }
-            scroll(inspector, up: true)
-            settle()
-        }
-        for _ in 0..<24 {
-            if isVisible(element, in: inspector) { settle(); return true }
-            scroll(inspector, up: false)
+            // Move toward the target's actual frame instead of sweeping the
+            // whole inspector: a full sweep both overshoots small panels and
+            // takes long enough to hit the test's time allowance. A target
+            // above the visible top needs the content to move down, and every
+            // other case moves the content up.
+            let top = inspector.frame.minY + 4
+            scroll(inspector, up: element.frame.midY > top)
             settle()
         }
         return isVisible(element, in: inspector)
@@ -211,13 +212,17 @@ final class Phase33GroupUITests: XCTestCase {
     @MainActor
     private func isVisible(_ element: XCUIElement, in inspector: XCUIElement) -> Bool {
         guard element.exists, element.isHittable else { return false }
-        // The pinned array panel overlays the bottom of the column. `isHittable`
-        // still reports elements beneath it, so the visible bottom is its top.
-        let pinned = inspector.descendants(matching: .any)["array.panel"]
-        let bounds = inspector.frame.insetBy(dx: 0, dy: 4)
-        let bottom = pinned.exists ? min(bounds.maxY, pinned.frame.minY) : bounds.maxY
         let frame = element.frame
-        return frame.minY >= bounds.minY && frame.maxY <= bottom
+        return frame.minY >= inspector.frame.minY + 4 && frame.maxY <= visibleBottom(inspector)
+    }
+
+    /// The dock occupies its own space below the ScrollView, so the scroll's
+    /// visible bottom is the dock's top.
+    @MainActor
+    private func visibleBottom(_ inspector: XCUIElement) -> CGFloat {
+        let pinned = inspector.descendants(matching: .any)["array.panel"]
+        let maxY = inspector.frame.maxY - 4
+        return pinned.exists ? min(maxY, pinned.frame.minY) : maxY
     }
 
     /// Scrolls from the inspector's outer gutter. A swipe in the middle lands
