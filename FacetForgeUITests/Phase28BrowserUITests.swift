@@ -97,7 +97,8 @@ final class Phase28BrowserUITests: XCTestCase {
         )
         XCTAssertTrue(
             waitForCondition(timeout: 10) {
-                element("shell.browser.message", app).label.contains("Renamed to Phase28 Aurora.ffp")
+                let message = element("shell.browser.message", app)
+                return message.exists && message.label.contains("Renamed to Phase28 Aurora.ffp")
             },
             "the rename message did not appear"
         )
@@ -130,7 +131,8 @@ final class Phase28BrowserUITests: XCTestCase {
         element("shell.browser.duplicate", app).tap()
         XCTAssertTrue(
             waitForCondition(timeout: 10) {
-                element("shell.browser.message", app).label.contains("Duplicated to Phase28 Aurora copy.ffp")
+                let message = element("shell.browser.message", app)
+                return message.exists && message.label.contains("Duplicated to Phase28 Aurora copy.ffp")
             },
             "the duplicate message did not appear"
         )
@@ -149,7 +151,8 @@ final class Phase28BrowserUITests: XCTestCase {
         confirm.tap()
         XCTAssertTrue(
             waitForCondition(timeout: 10) {
-                element("shell.browser.message", app).label.contains("Deleted Phase28 Aurora copy.ffp")
+                let message = element("shell.browser.message", app)
+                return message.exists && message.label.contains("Deleted Phase28 Aurora copy.ffp")
             },
             "the delete message did not appear"
         )

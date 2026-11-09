@@ -192,21 +192,42 @@ final class Phase33GroupUITests: XCTestCase {
         // A successful reveal settles too: the chip's tap must not be read as
         // the scroll's deceleration.
         for _ in 0..<8 {
-            if isHittable(element) { settle(); return true }
-            inspector.swipeUp()
+            if isVisible(element, in: inspector) { settle(); return true }
+            scroll(inspector, up: true)
             settle()
         }
         for _ in 0..<14 {
-            if isHittable(element) { settle(); return true }
-            inspector.swipeDown()
+            if isVisible(element, in: inspector) { settle(); return true }
+            scroll(inspector, up: false)
             settle()
         }
-        return isHittable(element)
+        return isVisible(element, in: inspector)
     }
 
+    /// `isHittable` alone lies for this inspector: an element below the scroll
+    /// view's visible bounds can still report hittable, and the synthesized tap
+    /// then lands on nothing. Require the element's frame to be wholly inside
+    /// the inspector as well.
     @MainActor
-    private func isHittable(_ element: XCUIElement) -> Bool {
-        element.exists && element.isHittable
+    private func isVisible(_ element: XCUIElement, in inspector: XCUIElement) -> Bool {
+        guard element.exists, element.isHittable else { return false }
+        let bounds = inspector.frame.insetBy(dx: 0, dy: 4)
+        let frame = element.frame
+        return frame.minY >= bounds.minY && frame.maxY <= bounds.maxY
+    }
+
+    /// Scrolls from the inspector's outer gutter. A swipe in the middle lands
+    /// on an object-tree row, whose long-press-drag gesture never yields to the
+    /// scroll view, so a reveal from the centre can leave the view where it was.
+    @MainActor
+    private func scroll(_ inspector: XCUIElement, up: Bool) {
+        let start = inspector.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.85 : 0.15)
+        )
+        let end = inspector.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.15 : 0.85)
+        )
+        start.press(forDuration: 0.05, thenDragTo: end)
     }
 
     private func settle() {
