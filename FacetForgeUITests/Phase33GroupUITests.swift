@@ -202,7 +202,18 @@ final class Phase33GroupUITests: XCTestCase {
             scroll(inspector, up: element.frame.midY > top)
             settle()
         }
-        return isVisible(element, in: inspector)
+        let found = isVisible(element, in: inspector)
+        if !found {
+            let hierarchy = XCTAttachment(string: inspector.debugDescription)
+            hierarchy.name = "phase33-reveal-failure-hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "phase33-reveal-failure-screen"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        return found
     }
 
     /// `isHittable` alone lies for this inspector: an element below the scroll
@@ -232,13 +243,15 @@ final class Phase33GroupUITests: XCTestCase {
     /// start at 85% of the column is inside that panel and scrolls nothing.
     @MainActor
     private func scroll(_ inspector: XCUIElement, up: Bool) {
-        // A short step (about 275 pt) so a check lands inside each panel rather
-        // than jumping over a 300 pt section between two long swipes.
+        // A short step (about 340 pt) so a check lands inside each panel rather
+        // than jumping over a 300 pt section between two long swipes. The drag
+        // starts in the column's middle: the leading gutter is padding that the
+        // ScrollView does not always take as a pan in this hierarchy.
         let start = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.45 : 0.25)
+            withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.6 : 0.35)
         )
         let end = inspector.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.03, dy: up ? 0.25 : 0.45)
+            withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.35 : 0.6)
         )
         start.press(forDuration: 0.05, thenDragTo: end)
     }
