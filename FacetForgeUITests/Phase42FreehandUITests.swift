@@ -3,7 +3,10 @@ import XCTest
 /// Phase 42's user-visible half: the Sketch tool must be a real pencil. A drag
 /// on the shipping viewport draws a stroke, the card reports it, the smoothing
 /// control reaches the fit, and Finish commits one curve through the ordinary
-/// document path — then one undo removes it.
+/// document path — the object tree shows it as a curve — then one undo removes
+/// it. The tree is asserted rather than the app bar's status line because that
+/// line is legitimately shared with autosave and can be replaced within the
+/// thirty-second save beat; the tree is the durable document record.
 final class Phase42FreehandUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -77,11 +80,17 @@ final class Phase42FreehandUITests: XCTestCase {
             "the commit summary does not count the stored spans: \(committed.label)"
         )
 
-        let status = element("shell.document.status", app)
-        XCTAssertTrue(status.waitForExistence(timeout: 10), "the status line is missing")
+        // The commit is a real curve node in the document tree, not just a
+        // transient status line. The row's type is derived from the stored
+        // geometry, so this also proves the payload was a curve.
+        let nodeRow = element("tree.row.Freehand spline", app)
         XCTAssertTrue(
-            waitFor(timeout: 10, { status.label.contains("Freehand spline") }),
-            "the app bar did not report the committed spline: \(status.label)"
+            nodeRow.waitForExistence(timeout: 10),
+            "the committed spline is missing from the object tree"
+        )
+        XCTAssertTrue(
+            ((nodeRow.value as? String) ?? "").contains("Curve"),
+            "the committed node is not a curve: \(nodeRow.value ?? "")"
         )
 
         // The stroke is one ordinary document edit.
@@ -89,8 +98,8 @@ final class Phase42FreehandUITests: XCTestCase {
         XCTAssertTrue(undo.waitForExistence(timeout: 10), "the undo command is missing")
         undo.tap()
         XCTAssertTrue(
-            waitFor(timeout: 10, { status.label.contains("Undo") }),
-            "one undo did not run after the freehand commit: \(status.label)"
+            waitFor(timeout: 10, { !nodeRow.exists }),
+            "one undo did not remove the freehand spline from the object tree"
         )
 
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
