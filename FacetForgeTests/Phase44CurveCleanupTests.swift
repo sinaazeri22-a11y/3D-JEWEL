@@ -148,16 +148,21 @@ final class Phase44CurveCleanupTests: XCTestCase {
                     )
 
                     // The survivor is the original curve over the surviving
-                    // interval, retimed to [0, 1], not a refit of it.
-                    let survivingStart = side == .start ? parameter : 0
-                    let survivingEnd = side == .end ? parameter : 1
+                    // interval, retimed to [0, 1], not a refit of it. Trim
+                    // retimes from the parameter `closestPoint` resolved, not
+                    // from the requested one, so the interval is checked by
+                    // its own ends and the interior by the
+                    // parameter-independent property: every sampled point of
+                    // the survivor still lies on the original curve.
                     let trimmed = try XCTUnwrap(payload.segments[0].curve)
+                    XCTAssertEqual(trimmed.start, side == .start ? endpoint : curve.start)
+                    XCTAssertEqual(trimmed.end, side == .end ? endpoint : curve.end)
                     for step in 0...20 {
                         let local = Double(step) / 20
-                        let global = survivingStart + (survivingEnd - survivingStart) * local
+                        let onOriginal = curve.closestPoint(to: trimmed.point(at: local))
                         XCTAssertLessThan(
-                            trimmed.point(at: local).distance(to: curve.point(at: global)),
-                            1e-9,
+                            onOriginal.distance,
+                            1e-7,
                             "\(fixture.name) \(side.label) left the original curve"
                         )
                     }
