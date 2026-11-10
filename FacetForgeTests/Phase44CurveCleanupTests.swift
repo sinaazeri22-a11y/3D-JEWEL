@@ -651,7 +651,13 @@ final class Phase44CurveCleanupTests: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(decoded.path()).isClosed())
     }
 
-    private func makeSession(payload: FFCurvePayload = hump()) -> (FFEditorSession, UUID) {
+    /// A default argument cannot call an instance method, so the common case
+    /// is its own overload rather than `payload: FFCurvePayload = hump()`.
+    private func makeSession() -> (FFEditorSession, UUID) {
+        makeSession(payload: hump())
+    }
+
+    private func makeSession(payload: FFCurvePayload) -> (FFEditorSession, UUID) {
         let (document, nodeID) = makeDocument(with: payload)
         return (FFEditorSession(document: document), nodeID)
     }
