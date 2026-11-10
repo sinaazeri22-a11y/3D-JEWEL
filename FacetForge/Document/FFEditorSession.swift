@@ -87,6 +87,10 @@ final class FFEditorSession: ObservableObject {
     /// The last curve-edit refusal. A rejected point edit explains itself
     /// instead of leaving the curve looking unchanged for no reason.
     @Published private(set) var curveEditMessage: String?
+    /// Phase 44's last join measurement. The report is what lets a panel say
+    /// "G1" rather than merely "joined", and it stays readable after the
+    /// command returns so a readout never has to re-measure the seam.
+    @Published private(set) var lastCurveJoinReport: FFCurveJoinReport?
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -1665,6 +1669,277 @@ final class FFEditorSession: ObservableObject {
         }
         curveEditMessage = nil
         return comb
+    }
+
+    // MARK: - Curve cleanup
+
+    /// Cuts one end away at a cutter that must lie on that end's span. One
+    /// `perform` means one undo restores the whole span, and the surviving end
+    /// is the curve's own point at the resolved parameter rather than the raw
+    /// cutter, so the trimmed curve stays exactly on its original geometry.
+    @discardableResult
+    func trimCurve(nodeID: UUID, removing side: FFCurveEnd, at cutter: Vec2) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        do {
+            var endpoint = Vec2.zero
+            let changed = try documentSession.perform("Trim curve") { document in
+                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                    endpoint = try payload.trim(at: cutter, removing: side)
+                }
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+            }
+            guard changed else {
+                curveEditMessage = "That curve is already trimmed there"
+                return false
+            }
+            finishCurveEdit(
+                status: "Curve trimmed · \(side.label) at "
+                    + "\(FFPrecision.fixed(endpoint.x, decimals: 3)), "
+                    + "\(FFPrecision.fixed(endpoint.y, decimals: 3))"
+            )
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    /// Grows one end by a stated distance along its own tangent. The added span
+    /// is committed with the curve, so one undo restores the original length.
+    @discardableResult
+    func extendCurve(nodeID: UUID, at end: FFCurveEnd, by distance: Double) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        do {
+            let changed = try documentSession.perform("Extend curve") { document in
+                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                    _ = try payload.extend(at: end, by: distance)
+                }
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+            }
+            guard changed else {
+                curveEditMessage = "That curve could not be extended"
+                return false
+            }
+            finishCurveEdit(
+                status: "Curve extended · \(end.label) by \(FFPrecision.fixed(distance, decimals: 3)) mm"
+            )
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    /// Splits one curve into two nodes at a point on the curve. The new half is
+    /// a sibling carrying the source's transform, layer and visibility, and the
+    /// split is a single `perform`, so one undo removes the new node and
+    /// restores the unsplit span together.
+    @discardableResult
+    func splitCurve(nodeID: UUID, segment: Int, at point: Vec2) -> UUID? {
+        guard prepareCurveEdit(nodeID: nodeID) else { return nil }
+        guard let source = documentSession.document.node(withID: nodeID),
+              let location = documentSession.document.location(of: nodeID)
+        else {
+            curveEditMessage = "Select a curve before splitting it"
+            return nil
+        }
+
+        let name = nextCurveName(base: "Split")
+        var created: UUID?
+        do {
+            let changed = try documentSession.perform("Split curve") { document in
+                guard let payload = document.node(withID: nodeID)?.geometry?.curve else {
+                    throw FFCurveCleanupError.noSegment(segment)
+                }
+                let pieces = try payload.split(segment: segment, at: point)
+                guard try document.editCurvePayload(nodeID: nodeID, { $0 = pieces.left }) else {
+                    throw FFCurveCleanupError.noSegment(segment)
+                }
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+
+                var second = source
+                second.id = UUID()
+                second.name = name
+                second.geometry = .curve(pieces.right)
+                second.curvePrimitive = nil
+                second.children = []
+                guard document.insertNode(
+                    second,
+                    into: location.parent,
+                    at: location.index + 1
+                ) else {
+                    throw FFCurveCleanupError.noSegment(segment)
+                }
+                created = second.id
+            }
+            guard changed, let created else {
+                curveEditMessage = "That curve could not be split there"
+                return nil
+            }
+            selection.select([created])
+            finishCurveEdit(status: "Curve split · \(name)")
+            return created
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return nil
+        }
+    }
+
+    /// Joins two curve nodes into one. The second node's payload is mapped into
+    /// the first node's sketch plane by the similarity between their world
+    /// matrices, so a curve that has been moved or turned still joins where it
+    /// is drawn; a plane, scale or shear mismatch is refused with a sentence
+    /// rather than joined at an invented position. The seam continuity is
+    /// published so a panel can name G0, G1 or G2. One `perform` covers the
+    /// edit and the removal, so one undo restores both curves.
+    @discardableResult
+    func joinCurves(nodeID: UUID, with otherID: UUID) -> Bool {
+        guard nodeID != otherID else {
+            curveEditMessage = "Join needs two different curves"
+            return false
+        }
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        guard !isLocked(nodeID: otherID) else {
+            curveEditMessage = "That curve is on a locked layer"
+            return false
+        }
+        guard let otherPayload = documentSession.document.curvePayload(forNodeID: otherID),
+              let selfWorld = documentSession.document.worldMatrix(of: nodeID),
+              let otherWorld = documentSession.document.worldMatrix(of: otherID),
+              let relative = FFCurveCleanup.planarTransform(from: otherWorld, to: selfWorld),
+              let placed = otherPayload.transformed(by: relative)
+        else {
+            curveEditMessage = "Join needs both curves on one sketch plane at the same scale"
+            return false
+        }
+
+        do {
+            var report: FFCurveJoinReport?
+            let changed = try documentSession.perform("Join curves") { document in
+                guard let payload = document.node(withID: nodeID)?.geometry?.curve else {
+                    throw FFCurveCleanupError.emptyCurve
+                }
+                let outcome = try payload.joined(with: placed)
+                guard try document.editCurvePayload(nodeID: nodeID, { $0 = outcome.payload }) else {
+                    throw FFCurveCleanupError.emptyCurve
+                }
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+                guard document.detachNode(otherID) != nil else {
+                    throw FFCurveCleanupError.emptyCurve
+                }
+                report = outcome.report
+            }
+            guard changed, let report else {
+                curveEditMessage = "Those curves could not be joined"
+                return false
+            }
+            lastCurveJoinReport = report
+            selection.select([nodeID])
+            finishCurveEdit(status: "Curves joined · \(report.summary)")
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    /// Reverses the curve's direction of travel. The control points and knots
+    /// are reversed exactly, so the drawn geometry is unchanged while the start
+    /// and end swap.
+    @discardableResult
+    func reverseCurve(nodeID: UUID) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        do {
+            let changed = try documentSession.perform("Reverse curve") { document in
+                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                    guard let reversed = payload.reversed() else {
+                        throw FFCurveCleanupError.invalidCurve(segment: 0)
+                    }
+                    payload = reversed
+                }
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+            }
+            guard changed else {
+                curveEditMessage = "That curve is already reversed"
+                return false
+            }
+            finishCurveEdit(status: "Curve reversed")
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    /// Closes the curve, adding one straight span when the ends do not already
+    /// meet. Closing an already-closed curve is refused rather than silently
+    /// adding a degenerate span.
+    @discardableResult
+    func closeCurve(nodeID: UUID) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        do {
+            var addedSpan = false
+            let changed = try documentSession.perform("Close curve") { document in
+                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                    addedSpan = try payload.close()
+                }
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+            }
+            guard changed else {
+                curveEditMessage = "That curve is already closed"
+                return false
+            }
+            finishCurveEdit(
+                status: addedSpan
+                    ? "Curve closed · one span added"
+                    : "Curve closed · ends already met"
+            )
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    /// Removes the data a curve carries that is not geometry: empty spans, a
+    /// span that repeats its predecessor, and repeated vertices in a polyline.
+    /// Nothing is removed when nothing is exact to remove, so no empty history
+    /// entry is created.
+    @discardableResult
+    func removeCurveDuplicates(nodeID: UUID) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        guard let payload = documentSession.document.curvePayload(forNodeID: nodeID) else {
+            return false
+        }
+        let report = payload.removingDuplicates()
+        guard report.hasChanges else {
+            curveEditMessage = "That curve has no duplicate points or empty spans"
+            return false
+        }
+
+        do {
+            let changed = try documentSession.perform("Remove duplicates") { document in
+                _ = try document.editCurvePayload(nodeID: nodeID, { $0 = report.payload })
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+            }
+            guard changed else {
+                curveEditMessage = "That curve has no duplicate points or empty spans"
+                return false
+            }
+            finishCurveEdit(status: report.summary)
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    /// A cleanup changes the stored geometry, so the parametric record that
+    /// would regenerate it no longer describes the curve. Dropping the record
+    /// keeps a later radius or side-count edit from silently overwriting the
+    /// cleanup the user just made.
+    private static func clearCurvePrimitive(in document: inout FFDocument, nodeID: UUID) {
+        _ = document.updateNode(withID: nodeID) { $0.curvePrimitive = nil }
     }
 
     private func prepareCurveEdit(nodeID: UUID) -> Bool {
