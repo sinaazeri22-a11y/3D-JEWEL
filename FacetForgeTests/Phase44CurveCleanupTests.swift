@@ -261,14 +261,15 @@ final class Phase44CurveCleanupTests: XCTestCase {
         let pieces = try payload.split(segment: 0, at: cutter)
 
         XCTAssertEqual(pieces.parameter, 0.3, accuracy: 1e-6)
-        XCTAssertLessThan(
-            try XCTUnwrap(pieces.left.segments.last?.curve).end.distance(to: cutter),
-            1e-9
-        )
-        XCTAssertLessThan(
-            try XCTUnwrap(pieces.right.segments.first?.curve).start.distance(to: cutter),
-            1e-9
-        )
+        let leftEnd = try XCTUnwrap(pieces.left.segments.last?.curve).end
+        let rightStart = try XCTUnwrap(pieces.right.segments.first?.curve).start
+        // The two halves share the split point exactly, because the split is
+        // one construction; the distance to the caller's cutter is bounded by
+        // the closest-point solver's 1e-10 parameter tolerance times the
+        // hump's ~93 mm/unit speed, so it is a measurement, not an identity.
+        XCTAssertEqual(leftEnd, rightStart)
+        XCTAssertLessThan(leftEnd.distance(to: cutter), 1e-7)
+        XCTAssertLessThan(rightStart.distance(to: cutter), 1e-7)
         assertOffCurve(try payload.split(segment: 0, at: point(40, 40)))
     }
 
@@ -279,7 +280,10 @@ final class Phase44CurveCleanupTests: XCTestCase {
 
         XCTAssertEqual(outcome.report.continuity, .g1)
         XCTAssertEqual(outcome.report.gap, 0, accuracy: 1e-12)
-        XCTAssertEqual(outcome.report.tangentAngle, 0, accuracy: 1e-9)
+        // Two identical unit tangents can read a few 1e-8 apart through acos
+        // after the dot product rounds, so the bound is the model's own G1
+        // tangent tolerance rather than zero to the last bit.
+        XCTAssertLessThan(outcome.report.tangentAngle, 1e-6)
         XCTAssertGreaterThan(
             outcome.report.curvatureDifference,
             1e-4,
