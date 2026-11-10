@@ -583,16 +583,20 @@ private extension FFCurveSegment {
     func matchesGeometry(of other: FFCurveSegment, tolerance: Double) -> Bool {
         guard controlPoints.count == other.controlPoints.count,
               weights.count == other.weights.count,
-              zip(weights, other.weights).allSatisfy({ abs($0 - $1) <= tolerance })
+              zip(weights, other.weights).allSatisfy({ mine, theirs in
+                  abs(mine - theirs) <= tolerance
+              })
         else { return false }
-        guard zip(controlPoints, other.controlPoints).allSatisfy({
-            $0.vector.distance(to: $1.vector) <= tolerance
+        guard zip(controlPoints, other.controlPoints).allSatisfy({ mine, theirs in
+            mine.vector.distance(to: theirs.vector) <= tolerance
         }) else { return false }
         if kind == .nurbs || other.kind == .nurbs {
             guard kind == other.kind,
                   degree == other.degree,
                   knots.count == other.knots.count,
-                  zip(knots, other.knots).allSatisfy({ abs($0 - $1) <= 1e-9 })
+                  zip(knots, other.knots).allSatisfy({ mine, theirs in
+                      abs(mine - theirs) <= 1e-9
+                  })
             else { return false }
         }
         return true
