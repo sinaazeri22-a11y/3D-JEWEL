@@ -295,6 +295,23 @@ struct FFAppShell: View {
                         lineDraft: session.lineChainDraft,
                         lineReadout: session.lineChainReadout,
                         lineMessage: session.lineToolMessage,
+                        freehandDraft: session.freehandDraft,
+                        freehandPointCount: session.freehandPointCount,
+                        freehandLength: session.freehandLength,
+                        freehandLastCommitted: session.lastFreehandSummary,
+                        freehandMessage: session.freehandToolMessage,
+                        onFreehandSample: { point in
+                            if !session.freehandDraft.isActive, point != nil {
+                                session.beginFreehand()
+                            }
+                            session.appendFreehand(at: point)
+                        },
+                        onFreehandEnd: {},
+                        onFreehandSmoothing: { session.setFreehandSmoothing($0) },
+                        onFreehandSimplify: { session.setFreehandSimplify($0) },
+                        onFreehandFinish: { session.finishFreehand() },
+                        onFreehandCancel: { session.cancelFreehand() },
+                        onAddPrimitive: { _ = session.addPrimitive(kind: $0) },
                         onLineTap: { session.tapLineChain(at: $0) },
                         onLinePreview: { session.previewLineChain(at: $0) },
                         onLineTypeLength: { session.typeLineChainLength($0, unit: lengthUnit) },
@@ -656,6 +673,20 @@ private struct FFViewport: View {
     let lineDraft: FFLineChainDraft
     let lineReadout: FFLineSegmentMeasure?
     let lineMessage: String?
+    /// Phase 42: the live stroke, its readout and its two fit controls. As with
+    /// the line chain, all of it is session state; this view draws and routes.
+    let freehandDraft: FFFreehandDraft
+    let freehandPointCount: Int
+    let freehandLength: Double
+    let freehandLastCommitted: String?
+    let freehandMessage: String?
+    let onFreehandSample: (Vec2?) -> Void
+    let onFreehandEnd: () -> Void
+    let onFreehandSmoothing: (Double) -> Void
+    let onFreehandSimplify: (Double) -> Void
+    let onFreehandFinish: () -> Void
+    let onFreehandCancel: () -> Void
+    let onAddPrimitive: (FFCurvePrimitiveKind) -> Void
     let onLineTap: (Vec2?) -> Void
     let onLinePreview: (Vec2) -> Void
     let onLineTypeLength: (String) -> Void
@@ -685,6 +716,8 @@ private struct FFViewport: View {
 
     private var isDrawingLines: Bool { selectedTool == "line" }
 
+    private var isSketching: Bool { selectedTool == "sketch" }
+
     private var scaleBarPlan: FFScaleBarPlan? {
         guard let units = camera.worldUnitsPerPoint(
             viewport: Vec2(x: viewportSize.width, y: viewportSize.height)
@@ -707,6 +740,41 @@ private struct FFViewport: View {
 
             viewportSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if layout == .single, isSketching {
+                GeometryReader { proxy in
+                    ZStack(alignment: .bottomLeading) {
+                        FFFreehandSurfaceLayer(
+                            scene: scene,
+                            camera: camera,
+                            onSample: onFreehandSample,
+                            onEnd: onFreehandEnd
+                        )
+
+                        FFFreehandOverlay(
+                            samples: freehandDraft.preview,
+                            camera: camera,
+                            viewport: proxy.size
+                        )
+
+                        FFFreehandPanel(
+                            draft: freehandDraft,
+                            pointCount: freehandPointCount,
+                            length: freehandLength,
+                            lastCommitted: freehandLastCommitted,
+                            message: freehandMessage,
+                            unit: lengthUnit,
+                            onSmoothing: onFreehandSmoothing,
+                            onSimplify: onFreehandSimplify,
+                            onFinish: onFreehandFinish,
+                            onCancel: onFreehandCancel,
+                            onAddPrimitive: onAddPrimitive
+                        )
+                        .padding(.leading, FFSpace.sm)
+                        .padding(.bottom, 72)
+                    }
+                }
+            }
 
             VStack(spacing: 0) {
                 HStack(alignment: .top, spacing: FFSpace.sm) {
@@ -880,6 +948,9 @@ private struct FFViewport: View {
             if tool != "line" {
                 onLineCancel()
             }
+            if tool != "sketch" {
+                onFreehandCancel()
+            }
         }
     }
 
@@ -913,6 +984,7 @@ private struct FFViewport: View {
                     onUndoEdit: onUndoEdit,
                     isMeasuring: isMeasuring,
                     isDrawingLines: isDrawingLines,
+                    isSketching: isSketching,
                     unit: lengthUnit,
                     metalIdentifier: "shell.viewport.metal",
                     onCycleDisplayMode: { onCycleDisplayMode(pane.id) },
@@ -988,6 +1060,7 @@ private struct FFViewport: View {
             // happen in the maximised Perspective pane a document opens in.
             isMeasuring: false,
             isDrawingLines: false,
+            isSketching: false,
             unit: lengthUnit,
             metalIdentifier: "shell.viewport.metal.\(pane.id)",
             onCycleDisplayMode: { onCycleDisplayMode(pane.id) },
@@ -1059,6 +1132,7 @@ private struct FFViewportPane: View {
     let onUndoEdit: () -> Void
     let isMeasuring: Bool
     let isDrawingLines: Bool
+    let isSketching: Bool
     let unit: FFLengthUnit
     let metalIdentifier: String
     let onCycleDisplayMode: () -> Void
@@ -1132,7 +1206,7 @@ private struct FFViewportPane: View {
                     scene: displayScene,
                     mode: mode,
                     accessibilityIdentifier: metalIdentifier,
-                    allowsCameraGestures: !gizmoDragging && !selection.isMarquee,
+                    allowsCameraGestures: !gizmoDragging && !selection.isMarquee && !isSketching,
                     pickFilter: selection.filter,
                     onHover: { point in
                         measureTap.point = point
@@ -1143,6 +1217,11 @@ private struct FFViewportPane: View {
                         onCameraChange(updated)
                     },
                     onPick: { result in
+                        if isSketching {
+                            // The sketch gesture layer above owns pencil input;
+                            // a pick that still arrives must not move selection.
+                            return
+                        }
                         if isDrawingLines {
                             // The Line tool turns a tap into a sketch-plane
                             // vertex; the pick itself is not a selection.

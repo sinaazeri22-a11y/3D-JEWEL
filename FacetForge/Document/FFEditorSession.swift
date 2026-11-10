@@ -71,6 +71,16 @@ final class FFEditorSession: ObservableObject {
     /// The last arc-tool hint or refusal, so a rejected construction explains
     /// itself instead of silently dropping the tap.
     @Published private(set) var arcToolMessage: String?
+    /// Phase 42's live freehand stroke and its two fit controls. The draft is
+    /// transient tool state; the committed spline is an ordinary curve node,
+    /// so the document has no freehand-specific field or format.
+    @Published private(set) var freehandDraft = FFFreehandDraft()
+    /// The last freehand hint or refusal, shown in the sketch panel so a
+    /// refused stroke explains itself instead of vanishing.
+    @Published private(set) var freehandToolMessage: String?
+    /// The last committed stroke, in the panel's own words, so the sketch card
+    /// still shows what the commit produced after the draft clears.
+    @Published private(set) var lastFreehandSummary: String?
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -1366,6 +1376,98 @@ final class FFEditorSession: ObservableObject {
 
     private static func arcMessage(for error: Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+    }
+
+    // MARK: - Freehand tool
+
+    /// The live stroke in world space, for the viewport overlay. The session
+    /// owns the samples; the overlay only projects and draws them.
+    var freehandPreview: [Vec3] { freehandDraft.preview }
+
+    var freehandPointCount: Int { freehandDraft.pointCount }
+
+    /// The raw stroke length, before fitting. The panel shows this while the
+    /// pencil moves; the committed node's length is the fitted curve's.
+    var freehandLength: Double { freehandDraft.length }
+
+    /// Starts a stroke. Starting again clears the previous samples but keeps
+    /// the fit controls, so a retry does not reset the user's smoothing.
+    func beginFreehand() {
+        freehandDraft.begin()
+        freehandToolMessage = nil
+    }
+
+    /// One pencil sample, already resolved to the sketch plane. `nil` means
+    /// the gesture could not be resolved; that is stated, never swallowed.
+    @discardableResult
+    func appendFreehand(at point: Vec2?) -> Bool {
+        guard let point else {
+            freehandToolMessage = "That stroke meets neither geometry nor the sketch plane"
+            return false
+        }
+        // The first sample starts the stroke; the shell does not need a
+        // separate begin command because selecting Sketch is the mode.
+        if !freehandDraft.isActive {
+            freehandDraft.begin()
+        }
+        freehandDraft.append(point)
+        return true
+    }
+
+    /// The fit controls are tool state, not document state: moving a slider
+    /// while drawing never creates an undo step.
+    func setFreehandSmoothing(_ value: Double) {
+        guard value.isFinite else { return }
+        freehandDraft.smoothing = FFMath.clamp(value, to: 0...FFFreehandStroke.smoothingLimit)
+    }
+
+    func setFreehandSimplify(_ millimetres: Double) {
+        guard millimetres.isFinite, millimetres > 0 else { return }
+        freehandDraft.simplifyTolerance = FFMath.clamp(millimetres, to: 0.001...1)
+    }
+
+    /// Commits the stroke as one curve node. One `perform` means one undo step
+    /// and the same journal and autosave path as every other edit. The fit is
+    /// measured before the commit, so an unfaithful stroke is refused with a
+    /// sentence rather than stored.
+    @discardableResult
+    func finishFreehand() -> Bool {
+        guard freehandDraft.pointCount >= 2 else {
+            freehandToolMessage = FFFreehandError.notEnoughPoints.errorDescription
+            return false
+        }
+        do {
+            let payload = try freehandDraft.payload()
+            let name = nextCurveName(base: "Freehand spline")
+            let pointCount = freehandDraft.pointCount
+            let length = freehandDraft.length
+            let changed = documentSession.perform("Freehand spline") { document in
+                document.rootNodes.append(FFNode(
+                    name: name,
+                    geometry: .curve(payload),
+                    kind: .curve,
+                    layerID: document.currentLayerID
+                ))
+            }
+            guard changed else { return false }
+            let unit = documentSession.document.displayUnit
+            let summary = "Committed · \(payload.segments.count) segments · \(pointCount) points"
+            freehandDraft.cancel()
+            freehandToolMessage = nil
+            lastFreehandSummary = summary
+            syncDocumentState()
+            documentStatus = "Freehand spline · \(pointCount) points · \(FFPrecision.lengthString(millimetres: length, unit: unit))"
+            return true
+        } catch {
+            freehandToolMessage = (error as? LocalizedError)?.errorDescription
+                ?? String(describing: error)
+            return false
+        }
+    }
+
+    func cancelFreehand() {
+        freehandDraft.cancel()
+        freehandToolMessage = nil
     }
 
     // MARK: - Primitive curves
