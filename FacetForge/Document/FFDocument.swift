@@ -416,6 +416,10 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
     /// mesh uses `materialID`. Encoding omits it while nil, so an untouched
     /// document's canonical hash does not move.
     var faceGroups: [FFFaceGroup]?
+    /// Phase 41's parametric definition for a primitive curve. Optional so
+    /// schema-1 documents written before Phase 41 still decode; encoding omits
+    /// it while nil, so an untouched document's canonical hash does not move.
+    var curvePrimitive: FFCurvePrimitive?
     var children: [FFNode]
 
     init(
@@ -430,6 +434,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         pivot: FFPoint3? = nil,
         array: FFArrayParameters? = nil,
         faceGroups: [FFFaceGroup]? = nil,
+        curvePrimitive: FFCurvePrimitive? = nil,
         children: [FFNode] = []
     ) {
         self.id = id
@@ -443,6 +448,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         self.pivot = pivot
         self.array = array
         self.faceGroups = faceGroups
+        self.curvePrimitive = curvePrimitive
         self.children = children
     }
 

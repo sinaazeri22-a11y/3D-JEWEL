@@ -1368,6 +1368,96 @@ final class FFEditorSession: ObservableObject {
         (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     }
 
+    // MARK: - Primitive curves
+
+    /// The selected node's primitive, or nil when the selection is not one
+    /// parametric primitive. The panel reads this projection; the document
+    /// remains the owner of the parameters.
+    func primitiveInfo() -> FFPrimitiveInfo? {
+        guard selection.selectedIDs.count == 1, let id = selection.selectedIDs.first else {
+            return nil
+        }
+        return documentSession.document.primitiveInfo(for: id)
+    }
+
+    /// Creates a primitive at the sketch origin as one undoable edit and
+    /// selects it, so the next command edits what was just made.
+    @discardableResult
+    func addPrimitive(kind: FFCurvePrimitiveKind) -> UUID? {
+        let primitive = FFCurvePrimitive(kind: kind)
+        var created: UUID?
+        let changed = documentSession.perform("Add \(kind.label)") { document in
+            created = document.addPrimitive(
+                primitive,
+                name: kind.label,
+                layerID: document.currentLayerID
+            )
+        }
+        guard changed, let created else {
+            documentStatus = "Could not add \(kind.label)"
+            return nil
+        }
+        selection.select([created])
+        syncDocumentState()
+        documentStatus = "\(kind.label) · \(primitive.summary(unit: documentSession.document.displayUnit))"
+        return created
+    }
+
+    /// One parameter edit of the selected primitive, one undo step. The
+    /// document refuses an unchanged or out-of-range value, so a held button
+    /// commits nothing; a valid edit regenerates the payload in place and never
+    /// touches the node's transform or centre.
+    @discardableResult
+    func setPrimitiveField(_ field: FFPrimitiveField, to value: Double) -> Bool {
+        guard let info = primitiveInfo() else {
+            documentStatus = "Select a primitive curve to edit it"
+            return false
+        }
+        var edited = info.primitive
+        guard edited.set(field, to: value) else {
+            documentStatus = Self.primitiveMessage(for: field, kind: info.primitive.kind, value: value, primitive: info.primitive)
+            return false
+        }
+        let changed = documentSession.perform("Edit \(info.primitive.kind.label)") { document in
+            _ = document.setPrimitive(info.nodeID) { primitive in
+                primitive.set(field, to: value)
+            }
+        }
+        guard changed else {
+            documentStatus = "\(field.label) is out of range"
+            return false
+        }
+        syncDocumentState()
+        documentStatus = "\(info.primitive.kind.label) · \(edited.summary(unit: documentSession.document.displayUnit))"
+        return true
+    }
+
+    /// The sentence for a refused edit. It names the field and the rule rather
+    /// than repeating a generic range error, because the refusal is the only
+    /// feedback a thumb gets.
+    private static func primitiveMessage(
+        for field: FFPrimitiveField,
+        kind: FFCurvePrimitiveKind,
+        value: Double,
+        primitive: FFCurvePrimitive
+    ) -> String {
+        guard value.isFinite else {
+            return FFPrimitiveError.notFinite.errorDescription ?? "Invalid value"
+        }
+        switch (kind, field) {
+        case (.roundedRectangle, .cornerRadius):
+            return FFPrimitiveError.cornerTooLarge(
+                maximum: min(primitive.width, primitive.height) / 2
+            ).errorDescription ?? "Corner radius is out of range"
+        case (.polygon, .sides):
+            return FFPrimitiveError.tooFewSides.errorDescription ?? "Sides are out of range"
+        case (_, .radius), (_, .diameter), (_, .width), (_, .height):
+            return FFPrimitiveError.nonPositiveSize.errorDescription ?? "Size is out of range"
+        default:
+            return FFPrimitiveError.fieldNotAvailable.errorDescription ?? "Parameter is not available"
+        }
+    }
+
     // MARK: - Interchange
 
     /// Imports a parsed OBJ as one undoable document edit. Materials and nodes
