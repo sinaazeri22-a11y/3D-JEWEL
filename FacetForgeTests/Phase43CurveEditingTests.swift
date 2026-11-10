@@ -8,10 +8,9 @@ import XCTest
 ///
 /// The sequence is deliberately cumulative: each operation builds on the
 /// previous payload, so an operation that quietly does nothing hashes the same
-/// payload as its neighbour and fails the distinctness check. The fingerprints
-/// are compared with each other rather than pinned, because a pinned sequence
-/// can only be produced by this exact runtime and would encode float noise as
-/// expected behaviour.
+/// payload as its neighbour and fails the distinctness check. The whole script
+/// runs twice and both hash sequences must agree, which is the expected-hash
+/// check without pinning values that only one runtime can produce.
 final class Phase43CurveEditingTests: XCTestCase {
     // MARK: - Fixtures
 
@@ -118,7 +117,27 @@ final class Phase43CurveEditingTests: XCTestCase {
 
     // MARK: - Twenty-five operations
 
-    func testTwentyFiveEditingOperationsLeaveDistinctJoinedPayloads() throws {
+    func testTwentyFiveEditingOperationsProduceAReproducibleHashSequence() throws {
+        let first = try applyTwentyFiveEditingOperations()
+        let second = try applyTwentyFiveEditingOperations()
+
+        XCTAssertEqual(first.labels.count, 25)
+        XCTAssertEqual(first.hashes.count, 25)
+        XCTAssertEqual(Set(first.hashes).count, 25, "an operation left the payload unchanged")
+        XCTAssertEqual(second.hashes, first.hashes, "the script did not reproduce its hash sequence")
+        XCTAssertEqual(first.payload.segments[0].controlPoints.count, 8)
+        XCTAssertEqual(first.payload.segments[1].controlPoints.count, 7)
+    }
+
+    /// Applies the 25 cumulative edits and returns each step's label, the
+    /// fingerprint sequence and the final payload. The test runs it twice, so
+    /// the first sequence is the expected hash sequence for the second, and an
+    /// operation that quietly does nothing collides with its neighbour.
+    private func applyTwentyFiveEditingOperations() throws -> (
+        labels: [String],
+        hashes: [String],
+        payload: FFCurvePayload
+    ) {
         var payload = basePayload()
         var hashes: [String] = []
         var labels: [String] = []
@@ -180,18 +199,7 @@ final class Phase43CurveEditingTests: XCTestCase {
         try payload.moveControlPoint(FFCurvePointRef(segment: 1, point: 6), to: point(161, 1))
         record("move span 2 end")
 
-        XCTAssertEqual(labels.count, 25)
-        XCTAssertEqual(hashes.count, 25)
-        XCTAssertEqual(Set(hashes).count, 25, "an operation left the payload unchanged")
-        for index in 1..<hashes.count {
-            XCTAssertNotEqual(
-                hashes[index - 1],
-                hashes[index],
-                "operation \(index + 1), \(labels[index]), repeated its predecessor"
-            )
-        }
-        XCTAssertEqual(payload.segments[0].controlPoints.count, 8)
-        XCTAssertEqual(payload.segments[1].controlPoints.count, 7)
+        return (labels, hashes, payload)
     }
 
     func testSharedJoinMoveFollowsBothSegmentsWithoutMovingTheirOtherPoints() throws {
