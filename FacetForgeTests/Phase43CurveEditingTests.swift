@@ -125,8 +125,11 @@ final class Phase43CurveEditingTests: XCTestCase {
         XCTAssertEqual(first.hashes.count, 25)
         XCTAssertEqual(Set(first.hashes).count, 25, "an operation left the payload unchanged")
         XCTAssertEqual(second.hashes, first.hashes, "the script did not reproduce its hash sequence")
+        // Span 1 is elevated three times, inserted into three times and loses
+        // two interior points; span 2 is elevated twice, inserted into twice
+        // and loses two interior points.
         XCTAssertEqual(first.payload.segments[0].controlPoints.count, 8)
-        XCTAssertEqual(first.payload.segments[1].controlPoints.count, 7)
+        XCTAssertEqual(first.payload.segments[1].controlPoints.count, 6)
     }
 
     /// Applies the 25 cumulative edits and returns each step's label, the
@@ -196,7 +199,10 @@ final class Phase43CurveEditingTests: XCTestCase {
         record("delete span 2 point 3")
         try payload.moveControlPoint(FFCurvePointRef(segment: 0, point: 0), to: point(1, 2))
         record("move span 1 start")
-        try payload.moveControlPoint(FFCurvePointRef(segment: 1, point: 6), to: point(161, 1))
+        try payload.moveControlPoint(
+            FFCurvePointRef(segment: 1, point: payload.segments[1].controlPoints.count - 1),
+            to: point(161, 1)
+        )
         record("move span 2 end")
 
         return (labels, hashes, payload)
