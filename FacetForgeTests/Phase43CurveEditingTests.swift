@@ -1,0 +1,737 @@
+import Foundation
+import XCTest
+@testable import FacetForge
+
+/// Phase 43's acceptance: twenty-five editing operations produce the expected
+/// curve hashes, and a weight change is reflected in the curvature comb.
+///
+/// The hash sequence is deliberately sequential: each operation builds on the
+/// previous payload, so a single changed control point, weight, knot or degree
+/// shifts every later hash. The expected values were pinned from the same
+/// canonical, nanometre-quantised fingerprint the test reads, not recomputed
+/// from the operation under test, so an operation that quietly does nothing
+/// cannot pass by hashing its own input twice.
+final class Phase43CurveEditingTests: XCTestCase {
+    // MARK: - Fixtures
+
+    private func point(_ x: Double, _ y: Double) -> Vec2 {
+        Vec2(x: x, y: y)
+    }
+
+    /// Two joined cubic NURBS spans that meet exactly at (80, 0). The shared
+    /// endpoint is what makes the drag test prove join propagation.
+    private func basePayload() -> FFCurvePayload {
+        FFCurvePayload(segments: [
+            FFCurveSegment(
+                kind: .nurbs,
+                controlPoints: [
+                    FFPoint2(point(0, 0)),
+                    FFPoint2(point(20, 30)),
+                    FFPoint2(point(60, 30)),
+                    FFPoint2(point(80, 0)),
+                ],
+                weights: [1, 1, 1, 1],
+                degree: 3,
+                knots: [0, 0, 0, 0, 1, 1, 1, 1]
+            ),
+            FFCurveSegment(
+                kind: .nurbs,
+                controlPoints: [
+                    FFPoint2(point(80, 0)),
+                    FFPoint2(point(100, -30)),
+                    FFPoint2(point(140, -30)),
+                    FFPoint2(point(160, 0)),
+                ],
+                weights: [1, 1, 1, 1],
+                degree: 3,
+                knots: [0, 0, 0, 0, 1, 1, 1, 1]
+            ),
+        ])
+    }
+
+    private func weightedCubic() -> FFCurvePayload {
+        FFCurvePayload(segments: [
+            FFCurveSegment(
+                kind: .nurbs,
+                controlPoints: [
+                    FFPoint2(point(0, 0)),
+                    FFPoint2(point(20, 30)),
+                    FFPoint2(point(60, 30)),
+                    FFPoint2(point(80, 0)),
+                ],
+                weights: [1, 1.2, 0.8, 1],
+                degree: 3,
+                knots: [0, 0, 0, 0, 1, 1, 1, 1]
+            ),
+        ])
+    }
+
+    private func cubicBezier() -> FFCurvePayload {
+        FFCurvePayload(segments: [
+            FFCurveSegment(
+                kind: .bezier,
+                controlPoints: [
+                    FFPoint2(point(0, 0)),
+                    FFPoint2(point(10, 20)),
+                    FFPoint2(point(30, 20)),
+                    FFPoint2(point(40, 0)),
+                ]
+            ),
+        ])
+    }
+
+    private func makeDocument(with payload: FFCurvePayload) -> (FFDocument, UUID) {
+        var document = FFDocument(name: "Phase 43")
+        let node = FFNode(
+            name: "Editable curve",
+            geometry: .curve(payload),
+            layerID: document.currentLayerID
+        )
+        document.rootNodes = [node]
+        return (document, node.id)
+    }
+
+    private func assertPoint(
+        _ actual: Vec2,
+        _ expected: Vec2,
+        accuracy: Double = 1e-9,
+        _ message: @autoclosure () -> String = "",
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(actual.x, expected.x, accuracy: accuracy, message(), file: file, line: line)
+        XCTAssertEqual(actual.y, expected.y, accuracy: accuracy, message(), file: file, line: line)
+    }
+
+    private func samples(
+        _ payload: FFCurvePayload,
+        segment index: Int,
+        count: Int = 100
+    ) throws -> [(t: Double, point: Vec2)] {
+        let curve = try XCTUnwrap(payload.segments[index].curve)
+        return (0...count).map { step in
+            let t = Double(step) / Double(count)
+            return (t, curve.point(at: t))
+        }
+    }
+
+    // MARK: - Twenty-five operations
+
+    func testTwentyFiveEditingOperationsProduceExpectedCurveHashes() throws {
+        var payload = basePayload()
+        var hashes: [String] = []
+        var labels: [String] = []
+
+        func record(_ label: String, file: StaticString = #filePath, line: UInt = #line) {
+            XCTAssertNotNil(payload.path(), "\(label) left the path unjoined", file: file, line: line)
+            labels.append(label)
+            hashes.append(payload.fingerprint)
+        }
+
+        try payload.moveControlPoint(FFCurvePointRef(segment: 0, point: 1), to: point(21, 33))
+        record("move span 1 point 2")
+        try payload.moveControlPoint(FFCurvePointRef(segment: 0, point: 2), to: point(59, 32))
+        record("move span 1 point 3")
+        try payload.moveControlPoint(FFCurvePointRef(segment: 1, point: 1), to: point(101, -33))
+        record("move span 2 point 2")
+        try payload.moveControlPoint(FFCurvePointRef(segment: 1, point: 2), to: point(139, -32))
+        record("move span 2 point 3")
+        try payload.moveControlPoint(FFCurvePointRef(segment: 0, point: 3), to: point(82, 1))
+        record("move shared join")
+        try payload.setWeight(FFCurvePointRef(segment: 0, point: 1), to: 1.2)
+        record("weight span 1 point 2")
+        try payload.setWeight(FFCurvePointRef(segment: 0, point: 2), to: 0.8)
+        record("weight span 1 point 3")
+        try payload.setWeight(FFCurvePointRef(segment: 1, point: 1), to: 2)
+        record("weight span 2 point 2")
+        try payload.setWeight(FFCurvePointRef(segment: 1, point: 2), to: 0.5)
+        record("weight span 2 point 3")
+        try payload.elevateDegree(segment: 0)
+        record("elevate span 1 to degree 4")
+        try payload.elevateDegree(segment: 1)
+        record("elevate span 2 to degree 4")
+        try payload.elevateDegree(segment: 0)
+        record("elevate span 1 to degree 5")
+        try payload.elevateDegree(segment: 1)
+        record("elevate span 2 to degree 5")
+        try payload.elevateDegree(segment: 0)
+        record("elevate span 1 to degree 6")
+        _ = try payload.insertControlPoint(segment: 0, at: 0.25)
+        record("insert span 1 at 0.25")
+        _ = try payload.insertControlPoint(segment: 0, at: 0.6)
+        record("insert span 1 at 0.6")
+        _ = try payload.insertControlPoint(segment: 1, at: 0.4)
+        record("insert span 2 at 0.4")
+        _ = try payload.insertControlPoint(segment: 1, at: 0.75)
+        record("insert span 2 at 0.75")
+        _ = try payload.insertControlPoint(segment: 0, at: 0.45)
+        record("insert span 1 at 0.45")
+        try payload.deleteControlPoint(FFCurvePointRef(segment: 0, point: 3))
+        record("delete span 1 point 4")
+        try payload.deleteControlPoint(FFCurvePointRef(segment: 0, point: 4))
+        record("delete span 1 point 5")
+        try payload.deleteControlPoint(FFCurvePointRef(segment: 1, point: 3))
+        record("delete span 2 point 4")
+        try payload.deleteControlPoint(FFCurvePointRef(segment: 1, point: 2))
+        record("delete span 2 point 3")
+        try payload.moveControlPoint(FFCurvePointRef(segment: 0, point: 0), to: point(1, 2))
+        record("move span 1 start")
+        try payload.moveControlPoint(FFCurvePointRef(segment: 1, point: 7), to: point(161, 1))
+        record("move span 2 end")
+
+        let expectedHashes = [
+            "0f47a8a726211f9e0b7d813dbdca2b798a05b0e1e63ee16ff03c40a0650d2f51",
+            "5496b58ecb9d99fdb7b63429c61447a3b457d3ad5171c93219327e0bfd4ab50c",
+            "15cb4b5ed29a35a6590cef64fcd9949c9c62242ea8835126792fc77f685145dd",
+            "1640f23d57344d1d19e39f875d10e03ca374e66efcf3f07301b8a508bbfc0571",
+            "4ba8eb7ded0ef7f06507086d4c27ab23ccece20c4b81c853dee5255b0cba7d1e",
+            "0eaee71d665becd32e09b977cc3135dba9f02d0e9e65ddaca2d2fe25ea2854bc",
+            "cd589dee277f2a381aea8ff9bbd967811855f3448194d1e38decc75ba50ad20b",
+            "6f1add42b17eecfc21c3334c23b7d8fff607a35e9e6359caebf10e1c6c5d7392",
+            "aaf89a126ad9aff09c32ce1207e06a5c6f39da6f8a6c8cdacc0bf5f3d9aed6d8",
+            "0878459cc314b8a2a49c72502137cfde09ef8e3c2cab9573569a65c742723861",
+            "3523442af1c4a3c0e22db6e51e9c4d7fd1a84d4cf8e9e1863cb9dc681a613890",
+            "15798edda36b808a77b2536533540d6ab417a45cc504f32e67c3f2ba9493101b",
+            "913d3812cce3bc957d62fc7a0cff7add9ed2efed6a20f6d47b8b9c6a6057e4f9",
+            "bb9eea4e5a6b5cdf1c93d5b0d706562506ab6d95583fa8f92aa7ba23b3b1a623",
+            "cfbb8715a37e803a8bbc46170ac0ce3f69fbd0d7af97a39eba9b3ea8d790ce57",
+            "cd1e0324d3442920e0086d921162fc920de958dbd5cdcc0190d0c250d3572396",
+            "ff0dc1b02d88a126b9cfa6db73d738a3681bafe668864bf7166ee5f7a125e904",
+            "22536142d44843c220b72403569b6ae719a9eea22ca87491042531a178a4118a",
+            "ee9e5a182f6a8157ce0c19096b96b2efe45683381a7e7aad014ef819413ace62",
+            "0b498cac12345be76a628eed535483aab1ed0b5aad0d9a3d6c18b9e95d24c217",
+            "97f71e69e507377c47faf7cfd52a7420e1061423538ceb9a653b8bc783d6d4f5",
+            "847006e4803aaf01a2e6b12d351881b247259a6c86bf5b055e8cb9ad7b9a1aa8",
+            "396cc6e7a83cfc10f22061af29caee7ab174f89b4bf409c9df09f93e009ed40e",
+            "d095db303af28a91419430858d5d6e1966a27866a47d53be911d5bee8cbfa009",
+            "e2a76a2054e05df38848e3fb812dd909bc8acd07912ea8b48f269c884517d6cb",
+        ]
+
+        XCTAssertEqual(labels.count, 25)
+        XCTAssertEqual(hashes.count, expectedHashes.count)
+        for index in expectedHashes.indices {
+            XCTAssertEqual(
+                hashes[index],
+                expectedHashes[index],
+                "operation \(index + 1), \(labels[index])"
+            )
+        }
+        XCTAssertEqual(Set(hashes).count, 25, "an operation left the payload unchanged")
+        XCTAssertEqual(payload.segments[0].controlPoints.count, 8)
+        XCTAssertEqual(payload.segments[1].controlPoints.count, 6)
+    }
+
+    func testSharedJoinMoveFollowsBothSegmentsWithoutMovingTheirOtherPoints() throws {
+        var payload = basePayload()
+        try payload.moveControlPoint(FFCurvePointRef(segment: 0, point: 3), to: point(82, 1))
+
+        assertPoint(payload.segments[0].controlPoints[3].vector, point(82, 1))
+        assertPoint(payload.segments[1].controlPoints[0].vector, point(82, 1))
+        assertPoint(payload.segments[0].controlPoints[2].vector, point(60, 30))
+        assertPoint(payload.segments[1].controlPoints[1].vector, point(100, -30))
+    }
+
+    // MARK: - Curvature comb
+
+    func testWeightChangeIsReflectedInTheCurvatureComb() throws {
+        var payload = cubicBezier()
+        let before = try XCTUnwrap(payload.curvatureComb(samplesPerSegment: 16, scale: 2))
+        let beforeMid = try XCTUnwrap(before.first { abs($0.parameter - 0.5) < 1e-12 })
+
+        // The polynomial cubic's analytic curvature at t = 0.5 is
+        // |B' × B''| / |B'|³ = 5400 / 45³.
+        let expected = 5400.0 / (45.0 * 45.0 * 45.0)
+        XCTAssertEqual(beforeMid.curvature, expected, accuracy: 1e-12)
+        assertPoint(beforeMid.point, point(20, 15))
+        XCTAssertEqual(beforeMid.combTip.x, beforeMid.point.x, accuracy: 1e-12)
+        XCTAssertEqual(
+            beforeMid.combTip.y,
+            beforeMid.point.y + expected * 2,
+            accuracy: 1e-12
+        )
+
+        try payload.setWeight(FFCurvePointRef(segment: 0, point: 1), to: 2)
+        let after = try XCTUnwrap(payload.curvatureComb(samplesPerSegment: 16, scale: 2))
+        let afterMid = try XCTUnwrap(after.first { abs($0.parameter - 0.5) < 1e-12 })
+
+        XCTAssertGreaterThan(
+            abs(afterMid.curvature - beforeMid.curvature),
+            1e-4,
+            "the weight edit did not move the curvature"
+        )
+        XCTAssertNotEqual(
+            afterMid.combTip,
+            beforeMid.combTip,
+            "the comb tip did not follow the changed curvature"
+        )
+        for sample in after {
+            XCTAssertEqual(
+                sample.combTip.x,
+                sample.point.x + sample.normal.x * sample.curvature * 2,
+                accuracy: 1e-9
+            )
+            XCTAssertEqual(
+                sample.combTip.y,
+                sample.point.y + sample.normal.y * sample.curvature * 2,
+                accuracy: 1e-9
+            )
+        }
+    }
+
+    // MARK: - Insertion and degree elevation keep the curve
+
+    func testKnotInsertionKeepsEverySampledPointOnTheCurve() throws {
+        var payload = weightedCubic()
+        let before = payload
+        let ref = try payload.insertControlPoint(segment: 0, at: 0.37)
+
+        XCTAssertEqual(ref.segment, 0)
+        XCTAssertEqual(payload.segments[0].controlPoints.count, 5)
+        XCTAssertEqual(payload.segments[0].kind, .nurbs)
+        XCTAssertEqual(payload.segments[0].degree, 3)
+        XCTAssertEqual(payload.segments[0].knots.count, 9)
+
+        let oldSamples = try samples(before, segment: 0)
+        let newSamples = try samples(payload, segment: 0)
+        XCTAssertEqual(oldSamples.count, newSamples.count)
+        for (old, new) in zip(oldSamples, newSamples) {
+            XCTAssertEqual(old.t, new.t)
+            assertPoint(new.point, old.point, accuracy: 1e-9, "t = \(old.t)")
+        }
+
+        var bezier = cubicBezier()
+        let bezierBefore = bezier
+        _ = try bezier.insertControlPoint(segment: 0, at: 0.25)
+        XCTAssertEqual(bezier.segments[0].kind, .nurbs)
+        XCTAssertEqual(bezier.segments[0].controlPoints.count, 5)
+        let bezierOldSamples = try samples(bezierBefore, segment: 0)
+        let bezierNewSamples = try samples(bezier, segment: 0)
+        for (old, new) in zip(bezierOldSamples, bezierNewSamples) {
+            assertPoint(new.point, old.point, accuracy: 1e-9, "bezier t = \(old.t)")
+        }
+    }
+
+    func testDegreeElevationKeepsEverySampledPointOnTheCurve() throws {
+        var bezier = cubicBezier()
+        let bezierBefore = bezier
+        try bezier.elevateDegree(segment: 0)
+        XCTAssertEqual(bezier.segments[0].kind, .bezier)
+        XCTAssertEqual(bezier.segments[0].controlPoints.count, 5)
+        let bezierOldSamples = try samples(bezierBefore, segment: 0)
+        let bezierNewSamples = try samples(bezier, segment: 0)
+        for (old, new) in zip(bezierOldSamples, bezierNewSamples) {
+            assertPoint(new.point, old.point, accuracy: 1e-9, "bezier t = \(old.t)")
+        }
+
+        var nurbs = weightedCubic()
+        let nurbsBefore = nurbs
+        try nurbs.elevateDegree(segment: 0)
+        XCTAssertEqual(nurbs.segments[0].kind, .nurbs)
+        XCTAssertEqual(nurbs.segments[0].controlPoints.count, 5)
+        XCTAssertEqual(nurbs.segments[0].degree, 4)
+        let nurbsOldSamples = try samples(nurbsBefore, segment: 0)
+        let nurbsNewSamples = try samples(nurbs, segment: 0)
+        for (old, new) in zip(nurbsOldSamples, nurbsNewSamples) {
+            assertPoint(new.point, old.point, accuracy: 1e-9, "nurbs t = \(old.t)")
+        }
+    }
+
+    // MARK: - Knot display and tangent handles
+
+    func testKnotDisplayReportsDegreeMultiplicityAndRationalState() throws {
+        var payload = weightedCubic()
+        var display = try payload.knotDisplay(in: 0)
+
+        XCTAssertEqual(display.segment, 0)
+        XCTAssertEqual(display.degree, 3)
+        XCTAssertEqual(display.controlPointCount, 4)
+        XCTAssertFalse(display.isRational)
+        XCTAssertEqual(display.knots.count, 8)
+        XCTAssertEqual(display.multiplicities, [
+            FFKnotMultiplicity(value: 0, count: 4),
+            FFKnotMultiplicity(value: 1, count: 4),
+        ])
+
+        try payload.setWeight(FFCurvePointRef(segment: 0, point: 1), to: 1.2)
+        display = try payload.knotDisplay(in: 0)
+        XCTAssertTrue(display.isRational)
+        XCTAssertEqual(display.controlPointCount, 4)
+
+        _ = try payload.insertControlPoint(segment: 0, at: 0.25)
+        display = try payload.knotDisplay(in: 0)
+        XCTAssertEqual(display.controlPointCount, 5)
+        XCTAssertEqual(display.knots.count, 9)
+        XCTAssertEqual(display.multiplicities, [
+            FFKnotMultiplicity(value: 0, count: 4),
+            FFKnotMultiplicity(value: 0.25, count: 1),
+            FFKnotMultiplicity(value: 1, count: 4),
+        ])
+    }
+
+    func testTangentHandlesNameTheAdjacentControlPointAndItsEnd() throws {
+        let payload = basePayload()
+        let handles = try payload.tangentHandles(in: 1)
+
+        XCTAssertEqual(handles.count, 2)
+        XCTAssertEqual(handles[0].end, .start)
+        assertPoint(handles[0].origin, point(80, 0))
+        assertPoint(handles[0].tip, point(100, -30))
+        XCTAssertEqual(handles[0].controlPoint, FFCurvePointRef(segment: 1, point: 1))
+        XCTAssertEqual(handles[1].end, .end)
+        assertPoint(handles[1].origin, point(160, 0))
+        assertPoint(handles[1].tip, point(140, -30))
+        XCTAssertEqual(handles[1].controlPoint, FFCurvePointRef(segment: 1, point: 2))
+
+        let line = FFCurvePayload(segments: [
+            FFCurveSegment(
+                kind: .bezier,
+                controlPoints: [FFPoint2(point(0, 0)), FFPoint2(point(10, 0))]
+            ),
+        ])
+        XCTAssertTrue(try line.tangentHandles(in: 0).isEmpty)
+    }
+
+    // MARK: - Refusals
+
+    func testControlPointRefusalsLeaveThePayloadUntouched() throws {
+        var payload = basePayload()
+
+        let before = payload
+        XCTAssertThrowsError(
+            try payload.moveControlPoint(FFCurvePointRef(segment: 0, point: 0), to: point(.nan, 0))
+        ) { XCTAssertEqual($0 as? FFCurveEditError, .invalidPoint) }
+        XCTAssertEqual(payload, before)
+
+        XCTAssertThrowsError(
+            try payload.moveControlPoint(FFCurvePointRef(segment: 0, point: 0), to: point(.infinity, 0))
+        ) { XCTAssertEqual($0 as? FFCurveEditError, .invalidPoint) }
+        XCTAssertEqual(payload, before)
+
+        XCTAssertThrowsError(
+            try payload.moveControlPoint(FFCurvePointRef(segment: 2, point: 0), to: point(0, 0))
+        ) { XCTAssertEqual($0 as? FFCurveEditError, .noSegment(2)) }
+        XCTAssertEqual(payload, before)
+
+        XCTAssertThrowsError(
+            try payload.moveControlPoint(FFCurvePointRef(segment: 0, point: 9), to: point(0, 0))
+        ) { XCTAssertEqual($0 as? FFCurveEditError, .noPoint(segment: 0, point: 9)) }
+        XCTAssertEqual(payload, before)
+
+        for weight in [0, -1, Double.nan, Double.infinity] {
+            XCTAssertThrowsError(
+                try payload.setWeight(FFCurvePointRef(segment: 0, point: 1), to: weight)
+            ) { XCTAssertEqual($0 as? FFCurveEditError, .invalidWeight) }
+            XCTAssertEqual(payload, before)
+        }
+
+        XCTAssertThrowsError(
+            try payload.deleteControlPoint(FFCurvePointRef(segment: 0, point: 0))
+        ) { XCTAssertEqual($0 as? FFCurveEditError, .endpoint(segment: 0, point: 0)) }
+        XCTAssertEqual(payload, before)
+
+        XCTAssertThrowsError(
+            try payload.deleteControlPoint(FFCurvePointRef(segment: 0, point: 3))
+        ) { XCTAssertEqual($0 as? FFCurveEditError, .endpoint(segment: 0, point: 3)) }
+        XCTAssertEqual(payload, before)
+
+        XCTAssertThrowsError(
+            try payload.deleteControlPoint(FFCurvePointRef(segment: 0, point: 1))
+        ) { XCTAssertEqual($0 as? FFCurveEditError, .tooFewPoints(segment: 0)) }
+        XCTAssertEqual(payload, before)
+
+        for parameter in [0, 1, -0.1, 1.1, Double.nan, Double.infinity] {
+            XCTAssertThrowsError(
+                try payload.insertControlPoint(segment: 0, at: parameter)
+            ) { XCTAssertEqual($0 as? FFCurveEditError, .invalidParameter) }
+            XCTAssertEqual(payload, before)
+        }
+        XCTAssertThrowsError(
+            try payload.insertControlPoint(segment: 2, at: 0.5)
+        ) { XCTAssertEqual($0 as? FFCurveEditError, .noSegment(2)) }
+        XCTAssertEqual(payload, before)
+    }
+
+    func testKnotInsertionRefusesAKnotThatHasReachedTheDegree() throws {
+        var line = FFCurvePayload(segments: [
+            FFCurveSegment(
+                kind: .bezier,
+                controlPoints: [FFPoint2(point(0, 0)), FFPoint2(point(10, 0))]
+            ),
+        ])
+        _ = try line.insertControlPoint(segment: 0, at: 0.5)
+        let inserted = line
+
+        XCTAssertThrowsError(
+            try line.insertControlPoint(segment: 0, at: 0.5)
+        ) { XCTAssertEqual($0 as? FFCurveEditError, .cannotInsert(segment: 0)) }
+        XCTAssertEqual(line, inserted)
+    }
+
+    func testDegreeElevationRefusesAMultiSpanCurve() throws {
+        var payload = FFCurvePayload(segments: [
+            FFCurveSegment(
+                kind: .nurbs,
+                controlPoints: [
+                    FFPoint2(point(0, 0)),
+                    FFPoint2(point(10, 10)),
+                    FFPoint2(point(20, 0)),
+                    FFPoint2(point(30, 10)),
+                    FFPoint2(point(40, 0)),
+                ],
+                weights: [1, 1, 1, 1, 1],
+                degree: 3,
+                knots: [0, 0, 0, 0, 0.5, 1, 1, 1, 1]
+            ),
+        ])
+        let before = payload
+
+        XCTAssertThrowsError(try payload.elevateDegree(segment: 0)) {
+            XCTAssertEqual($0 as? FFCurveEditError, .notSingleSpan(segment: 0))
+        }
+        XCTAssertEqual(payload, before)
+    }
+
+    // MARK: - Adversarial inputs
+
+    /// A collinear run, a duplicated control point and a curve reduced to two
+    /// points are the shapes that make a naive derivative or knot normaliser
+    /// divide by zero. Every result must stay finite, and a zero-speed sample
+    /// must report zero curvature rather than a NaN comb.
+    func testCollinearDuplicateAndTwoPointCurvesStayFinite() throws {
+        var collinear = FFCurvePayload(segments: [
+            FFCurveSegment(
+                kind: .nurbs,
+                controlPoints: [
+                    FFPoint2(point(0, 0)),
+                    FFPoint2(point(10, 0)),
+                    FFPoint2(point(20, 0)),
+                ],
+                weights: [1, 1, 1],
+                degree: 2,
+                knots: [0, 0, 0, 1, 1, 1]
+            ),
+        ])
+        try collinear.moveControlPoint(FFCurvePointRef(segment: 0, point: 1), to: point(0, 0))
+        try collinear.setWeight(FFCurvePointRef(segment: 0, point: 1), to: 2)
+        try collinear.elevateDegree(segment: 0)
+        _ = try collinear.insertControlPoint(segment: 0, at: 0.5)
+
+        for controlPoint in collinear.segments[0].controlPoints {
+            XCTAssertTrue(controlPoint.x.isFinite)
+            XCTAssertTrue(controlPoint.y.isFinite)
+        }
+        for knot in collinear.segments[0].knots {
+            XCTAssertTrue(knot.isFinite)
+        }
+        let collinearComb = try XCTUnwrap(collinear.curvatureComb(samplesPerSegment: 8))
+        XCTAssertTrue(collinearComb.allSatisfy { sample in
+            sample.curvature.isFinite
+                && sample.normal.x.isFinite
+                && sample.normal.y.isFinite
+                && sample.combTip.x.isFinite
+                && sample.combTip.y.isFinite
+        })
+        XCTAssertNotNil(collinear.path())
+
+        var line = FFCurvePayload(segments: [
+            FFCurveSegment(
+                kind: .bezier,
+                controlPoints: [FFPoint2(point(0, 0)), FFPoint2(point(20, 0))]
+            ),
+        ])
+        try line.setWeight(FFCurvePointRef(segment: 0, point: 1), to: 2)
+        try line.elevateDegree(segment: 0)
+        _ = try line.insertControlPoint(segment: 0, at: 0.5)
+        XCTAssertEqual(line.segments[0].controlPoints.count, 4)
+        let lineCurve = try XCTUnwrap(line.segments[0].curve)
+        for step in 0...10 {
+            let sample = lineCurve.point(at: Double(step) / 10)
+            XCTAssertTrue(sample.x.isFinite)
+            XCTAssertTrue(sample.y.isFinite)
+        }
+        XCTAssertNotNil(line.path())
+        XCTAssertThrowsError(try line.deleteControlPoint(FFCurvePointRef(segment: 0, point: 0))) {
+            XCTAssertEqual($0 as? FFCurveEditError, .endpoint(segment: 0, point: 0))
+        }
+    }
+
+    // MARK: - Session ownership
+
+    func testEveryEditingCommandIsOneUndoStep() throws {
+        let (document, nodeID) = makeDocument(with: basePayload())
+        let session = FFEditorSession(document: document)
+        let original = try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint
+
+        XCTAssertTrue(session.moveCurveControlPoint(
+            nodeID: nodeID,
+            segment: 0,
+            point: 1,
+            to: point(21, 33)
+        ))
+        XCTAssertEqual(session.documentSession.undoDepth, 1)
+        XCTAssertTrue(session.undo())
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint,
+            original
+        )
+
+        XCTAssertTrue(session.setCurveWeight(nodeID: nodeID, segment: 0, point: 1, weight: 1.2))
+        XCTAssertEqual(session.documentSession.undoDepth, 1)
+        XCTAssertTrue(session.undo())
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint,
+            original
+        )
+
+        XCTAssertTrue(session.insertCurveControlPoint(nodeID: nodeID, segment: 0, at: 0.25))
+        XCTAssertEqual(session.documentSession.undoDepth, 1)
+        XCTAssertTrue(session.undo())
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint,
+            original
+        )
+
+        XCTAssertTrue(session.elevateCurveDegree(nodeID: nodeID, segment: 0))
+        XCTAssertEqual(session.documentSession.undoDepth, 1)
+        XCTAssertTrue(session.undo())
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint,
+            original
+        )
+
+        XCTAssertTrue(session.insertCurveControlPoint(nodeID: nodeID, segment: 0, at: 0.25))
+        XCTAssertTrue(session.deleteCurveControlPoint(nodeID: nodeID, segment: 0, point: 2))
+        XCTAssertEqual(session.documentSession.undoDepth, 2)
+        XCTAssertTrue(session.undo())
+        XCTAssertTrue(session.undo())
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint,
+            original
+        )
+    }
+
+    func testACoalescedDragIsOneUndoStep() throws {
+        let (document, nodeID) = makeDocument(with: basePayload())
+        let session = FFEditorSession(document: document)
+        let original = try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint
+
+        XCTAssertTrue(session.moveCurveControlPoint(
+            nodeID: nodeID,
+            segment: 0,
+            point: 1,
+            to: point(21, 33),
+            coalescingKey: "curve-drag-1"
+        ))
+        XCTAssertTrue(session.moveCurveControlPoint(
+            nodeID: nodeID,
+            segment: 0,
+            point: 1,
+            to: point(24, 36),
+            coalescingKey: "curve-drag-1"
+        ))
+        XCTAssertEqual(session.documentSession.undoDepth, 1)
+        let dragged = try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint
+        XCTAssertNotEqual(dragged, original)
+
+        XCTAssertTrue(session.undo())
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint,
+            original
+        )
+        XCTAssertTrue(session.redo())
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint,
+            dragged
+        )
+    }
+
+    func testWeightEditThroughTheSessionChangesTheCombAndUndoRestoresIt() throws {
+        let (document, nodeID) = makeDocument(with: cubicBezier())
+        let session = FFEditorSession(document: document)
+        let original = try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint
+        let before = try XCTUnwrap(session.curveCurvatureComb(nodeID: nodeID, samplesPerSegment: 16))
+        let beforeMid = try XCTUnwrap(before.first { abs($0.parameter - 0.5) < 1e-12 })
+
+        XCTAssertTrue(session.setCurveWeight(nodeID: nodeID, segment: 0, point: 1, weight: 2))
+        XCTAssertEqual(session.documentSession.undoDepth, 1)
+        let after = try XCTUnwrap(session.curveCurvatureComb(nodeID: nodeID, samplesPerSegment: 16))
+        let afterMid = try XCTUnwrap(after.first { abs($0.parameter - 0.5) < 1e-12 })
+        XCTAssertGreaterThan(abs(afterMid.curvature - beforeMid.curvature), 1e-4)
+
+        XCTAssertTrue(session.undo())
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint,
+            original
+        )
+        let restored = try XCTUnwrap(session.curveCurvatureComb(nodeID: nodeID, samplesPerSegment: 16))
+        let restoredMid = try XCTUnwrap(restored.first { abs($0.parameter - 0.5) < 1e-12 })
+        XCTAssertEqual(restoredMid.curvature, beforeMid.curvature, accuracy: 1e-12)
+    }
+
+    func testLockedCurveRefusesTheEditWithoutCreatingHistory() throws {
+        var made = makeDocument(with: basePayload())
+        made.0.layers[0].isLocked = true
+        let session = FFEditorSession(document: made.0)
+        let nodeID = made.1
+        let original = try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint
+
+        XCTAssertFalse(session.moveCurveControlPoint(
+            nodeID: nodeID,
+            segment: 0,
+            point: 1,
+            to: point(21, 33)
+        ))
+        XCTAssertEqual(session.documentSession.undoDepth, 0)
+        XCTAssertEqual(session.curveEditMessage, "That curve is on a locked layer")
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID)).fingerprint,
+            original
+        )
+    }
+
+    func testEditingOneCurveLeavesAnotherNodeAlone() throws {
+        var made = makeDocument(with: basePayload())
+        let nodeID = made.1
+        let other = FFNode(
+            name: "Other curve",
+            geometry: .curve(cubicBezier()),
+            layerID: made.0.currentLayerID
+        )
+        made.0.rootNodes.append(other)
+        let session = FFEditorSession(document: made.0)
+        let otherBefore = try XCTUnwrap(session.document.curvePayload(forNodeID: other.id)).fingerprint
+
+        XCTAssertTrue(session.moveCurveControlPoint(
+            nodeID: nodeID,
+            segment: 0,
+            point: 1,
+            to: point(21, 33)
+        ))
+        XCTAssertEqual(
+            try XCTUnwrap(session.document.curvePayload(forNodeID: other.id)).fingerprint,
+            otherBefore
+        )
+    }
+
+    func testEditingASavedCurveStillRebuildsAfterReopen() throws {
+        let (document, nodeID) = makeDocument(with: basePayload())
+        let session = FFEditorSession(document: document)
+        XCTAssertTrue(session.moveCurveControlPoint(
+            nodeID: nodeID,
+            segment: 0,
+            point: 1,
+            to: point(21, 33)
+        ))
+        let edited = try XCTUnwrap(session.document.curvePayload(forNodeID: nodeID))
+
+        let data = try JSONEncoder().encode(session.document)
+        let reopened = try JSONDecoder().decode(FFDocument.self, from: data)
+        let decoded = try XCTUnwrap(reopened.curvePayload(forNodeID: nodeID))
+
+        XCTAssertEqual(decoded.fingerprint, edited.fingerprint)
+        XCTAssertNotNil(decoded.path())
+        let curve = try XCTUnwrap(decoded.segments[0].curve)
+        let editedCurve = try XCTUnwrap(edited.segments[0].curve)
+        XCTAssertEqual(curve.point(at: 0.5).x, editedCurve.point(at: 0.5).x, accuracy: 1e-12)
+    }
+}

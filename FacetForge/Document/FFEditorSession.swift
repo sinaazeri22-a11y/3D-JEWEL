@@ -81,6 +81,12 @@ final class FFEditorSession: ObservableObject {
     /// The last committed stroke, in the panel's own words, so the sketch card
     /// still shows what the commit produced after the draft clears.
     @Published private(set) var lastFreehandSummary: String?
+    /// Phase 43's last control-point edit, in words a future curve panel can
+    /// show. The curve itself remains document state; this is feedback only.
+    @Published private(set) var lastCurveEditSummary: String?
+    /// The last curve-edit refusal. A rejected point edit explains itself
+    /// instead of leaving the curve looking unchanged for no reason.
+    @Published private(set) var curveEditMessage: String?
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -1468,6 +1474,221 @@ final class FFEditorSession: ObservableObject {
     func cancelFreehand() {
         freehandDraft.cancel()
         freehandToolMessage = nil
+    }
+
+    // MARK: - Curve control points
+
+    /// Moves one control point as a single document edit. A frame-by-frame
+    /// drag passes the same `coalescingKey` for every frame, so the whole
+    /// gesture is one undo step; a separate drag passes a new key or nil and
+    /// starts a new step. The point and the curve remain document state.
+    @discardableResult
+    func moveCurveControlPoint(
+        nodeID: UUID,
+        segment: Int,
+        point: Int,
+        to location: Vec2,
+        coalescingKey: String? = nil
+    ) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        let ref = FFCurvePointRef(segment: segment, point: point)
+        do {
+            let changed = try documentSession.perform(
+                "Move curve point",
+                coalescingKey: coalescingKey
+            ) { document in
+                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                    try payload.moveControlPoint(ref, to: location)
+                }
+            }
+            guard changed else {
+                curveEditMessage = "That control point is already there"
+                return false
+            }
+            finishCurveEdit(
+                status: "Curve point · segment \(segment + 1) · point \(point + 1)"
+            )
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    /// Inserts one control point at a parameter without changing the curve.
+    /// The inserted point is returned through the summary because a caller may
+    /// want to select it next; the document remains the stored truth.
+    @discardableResult
+    func insertCurveControlPoint(nodeID: UUID, segment: Int, at parameter: Double) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        var inserted: FFCurvePointRef?
+        do {
+            let changed = try documentSession.perform("Insert curve point") { document in
+                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                    inserted = try payload.insertControlPoint(segment: segment, at: parameter)
+                }
+            }
+            guard changed, let inserted else {
+                curveEditMessage = "A control point could not be inserted there"
+                return false
+            }
+            finishCurveEdit(
+                status: "Curve point · segment \(inserted.segment + 1) · point \(inserted.point + 1)"
+            )
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    @discardableResult
+    func deleteCurveControlPoint(nodeID: UUID, segment: Int, point: Int) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        let ref = FFCurvePointRef(segment: segment, point: point)
+        do {
+            let changed = try documentSession.perform("Delete curve point") { document in
+                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                    try payload.deleteControlPoint(ref)
+                }
+            }
+            guard changed else {
+                curveEditMessage = "That control point could not be deleted"
+                return false
+            }
+            finishCurveEdit(status: "Curve point removed · segment \(segment + 1)")
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    @discardableResult
+    func setCurveWeight(nodeID: UUID, segment: Int, point: Int, weight: Double) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        let ref = FFCurvePointRef(segment: segment, point: point)
+        do {
+            let changed = try documentSession.perform("Curve point weight") { document in
+                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                    try payload.setWeight(ref, to: weight)
+                }
+            }
+            guard changed else {
+                curveEditMessage = "That weight is already stored"
+                return false
+            }
+            finishCurveEdit(
+                status: "Curve weight · \(FFPrecision.fixed(weight, decimals: 3)) · segment \(segment + 1)"
+            )
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    @discardableResult
+    func elevateCurveDegree(nodeID: UUID, segment: Int) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        do {
+            let changed = try documentSession.perform("Elevate curve degree") { document in
+                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                    try payload.elevateDegree(segment: segment)
+                }
+            }
+            guard changed else {
+                curveEditMessage = "That degree could not be elevated"
+                return false
+            }
+            let degree = documentSession.document
+                .curvePayload(forNodeID: nodeID)?
+                .segments[segment].degree ?? 0
+            finishCurveEdit(status: "Curve degree · \(degree)")
+            return true
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    /// The knots a curve panel would display. Refusals are published, because a
+    /// segment with a damaged knot vector must not be drawn as if it were fine.
+    func curveKnots(nodeID: UUID, segment: Int) -> FFKnotDisplay? {
+        guard let payload = documentSession.document.curvePayload(forNodeID: nodeID) else {
+            curveEditMessage = "Select a curve before reading its knots"
+            return nil
+        }
+        do {
+            let display = try payload.knotDisplay(in: segment)
+            curveEditMessage = nil
+            return display
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return nil
+        }
+    }
+
+    func curveTangentHandles(nodeID: UUID, segment: Int) -> [FFTangentHandle]? {
+        guard let payload = documentSession.document.curvePayload(forNodeID: nodeID) else {
+            curveEditMessage = "Select a curve before reading its tangent handles"
+            return nil
+        }
+        do {
+            let handles = try payload.tangentHandles(in: segment)
+            curveEditMessage = nil
+            return handles
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return nil
+        }
+    }
+
+    /// The curvature comb used to prove a weight edit changes the curve. Phase
+    /// 47 owns the full diagnostics UI; this projection is the same measurement
+    /// the gate cites.
+    func curveCurvatureComb(
+        nodeID: UUID,
+        samplesPerSegment: Int = 16,
+        scale: Double = 1
+    ) -> [FFCurvatureSample]? {
+        guard let payload = documentSession.document.curvePayload(forNodeID: nodeID) else {
+            curveEditMessage = "Select a curve before reading its curvature"
+            return nil
+        }
+        guard let comb = payload.curvatureComb(
+            samplesPerSegment: samplesPerSegment,
+            scale: scale
+        ) else {
+            curveEditMessage = "That curve cannot be sampled for curvature"
+            return nil
+        }
+        curveEditMessage = nil
+        return comb
+    }
+
+    private func prepareCurveEdit(nodeID: UUID) -> Bool {
+        guard documentSession.document.node(withID: nodeID)?.geometry?.curve != nil else {
+            curveEditMessage = "Select a curve before editing its control points"
+            return false
+        }
+        guard !isLocked(nodeID: nodeID) else {
+            curveEditMessage = "That curve is on a locked layer"
+            return false
+        }
+        return true
+    }
+
+    private func finishCurveEdit(status: String) {
+        syncDocumentState()
+        curveEditMessage = nil
+        lastCurveEditSummary = status
+        documentStatus = status
+    }
+
+    private static func curveMessage(for error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription
+            ?? "The curve edit could not be applied"
     }
 
     // MARK: - Primitive curves

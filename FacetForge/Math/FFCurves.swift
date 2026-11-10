@@ -251,6 +251,43 @@ struct NURBSCurve2D: Equatable, Sendable {
         )
     }
 
+    /// Inserts one knot at `t` without changing the curve. The returned index
+    /// is the control point that carries the inserted knot, so an editor can
+    /// select the point it just introduced. A knot whose multiplicity has
+    /// already reached the degree cannot be inserted; the curve would be
+    /// over-parameterised and the operation has no exact meaning.
+    func insertingKnot(at t: Double) -> (curve: NURBSCurve2D, index: Int)? {
+        let u = FFMath.clamp(t, to: 0...1)
+        guard u > 1e-12, u < 1 - 1e-12 else { return nil }
+
+        let multiplicity = knots.reduce(0) { count, knot in
+            count + (abs(knot - u) <= 1e-12 ? 1 : 0)
+        }
+        guard multiplicity < degree else { return nil }
+
+        let lastControlIndex = controlPoints.count - 1
+        let spanIndex = Self.span(
+            in: knots,
+            degree: degree,
+            lastControlIndex: lastControlIndex,
+            u: u
+        )
+        let inserted = Self.insertKnot(
+            points: homogeneousControlPoints,
+            knots: knots,
+            degree: degree,
+            u: u
+        )
+        guard let curve = Self.makeCurve(
+            degree: degree,
+            points: inserted.0,
+            knots: inserted.1
+        ) else {
+            return nil
+        }
+        return (curve, spanIndex)
+    }
+
     func transformed(by matrix: Mat3) -> NURBSCurve2D? {
         NURBSCurve2D(
             degree: degree,
