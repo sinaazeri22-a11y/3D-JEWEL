@@ -66,6 +66,12 @@ struct FFFreehandStroke: Equatable, Sendable {
 
     /// The exact curve to commit. One call is deterministic for the same
     /// samples and controls.
+    ///
+    /// The two controls are preferences, not a reason to reject a stroke: if
+    /// neither the user's settings nor the tighter retries land inside the
+    /// budget, the final attempt interpolates every raw sample exactly. That
+    /// pass can never miss the 0.2 mm budget, because each sample is a knot of
+    /// the curve.
     func payload() throws -> FFCurvePayload {
         guard samples.count >= 2, samples.allSatisfy({ $0.x.isFinite && $0.y.isFinite }) else {
             throw FFFreehandError.notEnoughPoints
@@ -91,6 +97,16 @@ struct FFFreehandStroke: Equatable, Sendable {
             }
             amount = max(0, amount - 0.25)
             tolerance = max(1e-4, tolerance / 2)
+        }
+
+        // The user's simplify threshold and smoothing are preferences. A
+        // stroke the user actually drew must not be refused because the fit
+        // could not follow a sparse or snapped path; interpolating every
+        // sample is the faithful answer, at the cost of more spans.
+        let exact = Self.fit(points: Self.withoutRepeats(samples))
+        worst = maximumFitError(of: exact)
+        if worst <= Self.maximumFitError {
+            return exact
         }
         throw FFFreehandError.cannotFit(maximumError: worst)
     }
@@ -195,6 +211,20 @@ struct FFFreehandStroke: Equatable, Sendable {
             ))
         }
         return FFCurvePayload(segments: segments, isClosed: false)
+    }
+
+    /// Drops consecutive samples closer than the curve kernel's join distance.
+    /// A repeated sample would otherwise create a zero-length span whose
+    /// tangent handles can point anywhere.
+    static func withoutRepeats(_ points: [Vec2]) -> [Vec2] {
+        var result: [Vec2] = []
+        for point in points {
+            if let last = result.last, last.distance(to: point) <= FFTolerance.curveJoin {
+                continue
+            }
+            result.append(point)
+        }
+        return result
     }
 
     /// The distance from a point to a line segment, clamped to the segment.

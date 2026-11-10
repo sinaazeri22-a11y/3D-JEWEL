@@ -172,6 +172,48 @@ final class Phase42FreehandTests: XCTestCase {
         XCTAssertNotEqual(smoothedPayload, crispPayload, "smoothing does not reach the fit")
     }
 
+    /// The trunk gate found a real hole here: a sparse drag with a snapped
+    /// excursion can defeat simplification and smoothing even after the tighter
+    /// retries, because those retries only lower the tolerance. The exact final
+    /// pass must interpolate every sample instead of refusing a stroke the user
+    /// actually drew. This path is the shape that failed: thirteen samples,
+    /// direction reversals and a long excursion, 72.4 mm of polyline.
+    func testSparseIrregularStrokeFallsBackToExactInterpolation() throws {
+        let samples: [Vec2] = [
+            Vec2(x: 0, y: 0),
+            Vec2(x: 10.326329369471436, y: -5.355146037862373),
+            Vec2(x: 7.7900115174935305, y: -7.46010341943762),
+            Vec2(x: 5.763883640527505, y: -9.130090554183115),
+            Vec2(x: 1.6292676911597876, y: -11.964310815622726),
+            Vec2(x: 4.552912361639343, y: -11.314622395057524),
+            Vec2(x: 3.8548528375950113, y: -12.626147058779269),
+            Vec2(x: 4.91734133715217, y: 1.515372071835193),
+            Vec2(x: 5.751728169661602, y: -1.9770114362620195),
+            Vec2(x: 7.207588590294934, y: -4.483542103926327),
+            Vec2(x: 7.26657229086456, y: -4.761749360711795),
+            Vec2(x: 21.935847367803756, y: -7.23749520214443),
+            Vec2(x: 30.186920560315542, y: -12.060097631481996),
+        ]
+        let stroke = FFFreehandStroke(samples: samples)
+
+        // The preference attempts alone miss the budget, which is why this
+        // stroke is the regression case rather than another smooth arc.
+        let reduced = stroke.simplifiedPoints()
+        let preferred = FFFreehandStroke.fit(points: FFFreehandStroke.relaxed(reduced, amount: 0.7))
+        XCTAssertGreaterThan(
+            stroke.maximumFitError(of: preferred),
+            FFFreehandStroke.maximumFitError
+        )
+
+        let payload = try stroke.payload()
+        XCTAssertEqual(payload.segments.count, samples.count - 1, "the exact pass must keep every sample")
+        XCTAssertLessThanOrEqual(
+            stroke.maximumFitError(of: payload),
+            FFFreehandStroke.maximumFitError + 1e-9
+        )
+        XCTAssertNotNil(payload.path())
+    }
+
     // MARK: - Refusals
 
     func testAnIncompleteStrokeAndAnInvalidThresholdAreRefused() {
