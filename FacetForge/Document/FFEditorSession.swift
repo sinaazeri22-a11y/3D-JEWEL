@@ -64,6 +64,13 @@ final class FFEditorSession: ObservableObject {
     /// Curve nodes projected into world space for the viewport overlay. The
     /// session owns the projection; the view only draws it.
     @Published private(set) var curveNodes: [FFCurveRender] = []
+    /// Phase 40's live arc draft. Like the line chain it is transient tool
+    /// state: a finished arc is an ordinary curve node committed through
+    /// `perform`, so undo, the journal and autosave need no arc branch.
+    @Published private(set) var arcDraft = FFArcDraft()
+    /// The last arc-tool hint or refusal, so a rejected construction explains
+    /// itself instead of silently dropping the tap.
+    @Published private(set) var arcToolMessage: String?
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -1031,6 +1038,7 @@ final class FFEditorSession: ObservableObject {
         recoveryMessage = nil
         migrationReport = nil
         cancelLineChain()
+        cancelArc()
         isDirty = false
         autosaveMessage = nil
         documentStatus = "New document"
@@ -1051,6 +1059,7 @@ final class FFEditorSession: ObservableObject {
         recoveryMessage = nil
         migrationReport = nil
         cancelLineChain()
+        cancelArc()
         isDirty = false
         autosaveMessage = nil
         documentStatus = "Fixture loaded"
@@ -1279,12 +1288,84 @@ final class FFEditorSession: ObservableObject {
         (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     }
 
-    private func nextCurveName() -> String {
+    private func nextCurveName(base: String = "Line chain") -> String {
         let names = documentSession.document.curveNodeNames()
-        guard names.contains("Line chain") else { return "Line chain" }
+        guard names.contains(base) else { return base }
         var index = 2
-        while names.contains("Line chain \(index)") { index += 1 }
-        return "Line chain \(index)"
+        while names.contains("\(base) \(index)") { index += 1 }
+        return "\(base) \(index)"
+    }
+
+    // MARK: - Arc tool
+
+    /// The arc draft's preview in world space. Empty until all three points
+    /// arrive, so a view never draws a half-built arc as if it were final.
+    var arcPreview: [Vec3] { arcDraft.preview }
+
+    /// Starts an arc in one of Phase 40's three constructions. Starting again
+    /// replaces an unfinished draft rather than mixing two constructions.
+    func beginArc(mode: FFArcMode) {
+        arcDraft.begin(mode: mode)
+        arcToolMessage = nil
+    }
+
+    /// A viewport tap, already resolved to the sketch plane. The third
+    /// successful point completes the construction; the caller still decides
+    /// when to commit it.
+    @discardableResult
+    func tapArc(at point: Vec2?) -> Bool {
+        guard let point else {
+            arcToolMessage = "That tap meets neither geometry nor the sketch plane"
+            return false
+        }
+        do {
+            let complete = try arcDraft.add(point)
+            arcToolMessage = complete ? "Arc ready · press Finish" : nil
+            return complete
+        } catch {
+            arcToolMessage = Self.arcMessage(for: error)
+            return false
+        }
+    }
+
+    /// Commits the finished arc as one curve node. One `perform` means one undo
+    /// step and the same journal and autosave path as every other edit.
+    @discardableResult
+    func finishArc() -> Bool {
+        guard let arc = arcDraft.arc else {
+            arcToolMessage = FFArcError.notEnoughPoints.errorDescription
+            return false
+        }
+        do {
+            let payload = try arcDraft.payload()
+            let name = nextCurveName(base: "Arc")
+            let changed = documentSession.perform("Arc") { document in
+                document.rootNodes.append(FFNode(
+                    name: name,
+                    geometry: .curve(payload),
+                    kind: .curve,
+                    layerID: document.currentLayerID
+                ))
+            }
+            guard changed else { return false }
+            arcDraft.cancel()
+            arcToolMessage = nil
+            syncDocumentState()
+            documentStatus = "Arc · \(FFPrecision.lengthString(millimetres: arc.radius, unit: .millimetres)) radius · \(FFPrecision.angleString(degrees: abs(arc.sweepDegrees)))"
+            return true
+        } catch {
+            arcToolMessage = Self.arcMessage(for: error)
+            return false
+        }
+    }
+
+    func cancelArc() {
+        arcDraft.cancel()
+        arcToolMessage = nil
+    }
+
+    private static func arcMessage(for error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     }
 
     // MARK: - Interchange
@@ -1434,6 +1515,7 @@ final class FFEditorSession: ObservableObject {
         recoveryMessage = loaded.recovery?.message
         migrationReport = loaded.migration
         cancelLineChain()
+        cancelArc()
         selection = FFSelectionState.initial(for: scene)
         isDirty = false
         lastAutosaveAt = nil

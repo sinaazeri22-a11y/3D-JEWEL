@@ -73,6 +73,8 @@
 		A1000000000000000000009F /* FFDocumentTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A0 /* FFDocumentTemplates.swift */; };
 		A100000000000000000000A3 /* FFLineChainTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A4 /* FFLineChainTool.swift */; };
 		A100000000000000000000A5 /* FFLineChainOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A6 /* FFLineChainOverlay.swift */; };
+		A100000000000000000000A7 /* FFArcs.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A8 /* FFArcs.swift */; };
+		A100000000000000000000A9 /* FFArcTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AA /* FFArcTool.swift */; };
 		A100000000000000000000A1 /* FFPFormatMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A2 /* FFPFormatMigration.swift */; };
 		A2000000000000000000000B /* AppIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppIdentityTests.swift */; };
 		A2000000000000000000000F /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* DesignSystemTests.swift */; };
@@ -114,6 +116,7 @@
 		A20000000000000000000059 /* Phase37TemplateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000005A /* Phase37TemplateTests.swift */; };
 		A2000000000000000000005B /* Phase38FormatEvolutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000005C /* Phase38FormatEvolutionTests.swift */; };
 		A2000000000000000000005D /* Phase39LineChainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000005E /* Phase39LineChainTests.swift */; };
+		A2000000000000000000005F /* Phase40ArcTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* Phase40ArcTests.swift */; };
 		A3000000000000000000001F /* LayerPanelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000001E /* LayerPanelUITests.swift */; };
 		A30000000000000000000021 /* PerformanceHUDUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000020 /* PerformanceHUDUITests.swift */; };
 		A30000000000000000000023 /* Phase23SmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000022 /* Phase23SmokeUITests.swift */; };
@@ -223,6 +226,8 @@
 		A100000000000000000000A0 /* FFDocumentTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFDocumentTemplates.swift; sourceTree = "<group>"; };
 		A100000000000000000000A4 /* FFLineChainTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFLineChainTool.swift; sourceTree = "<group>"; };
 		A100000000000000000000A6 /* FFLineChainOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFLineChainOverlay.swift; sourceTree = "<group>"; };
+		A100000000000000000000A8 /* FFArcs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFArcs.swift; sourceTree = "<group>"; };
+		A100000000000000000000AA /* FFArcTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFArcTool.swift; sourceTree = "<group>"; };
 		A100000000000000000000A2 /* FFPFormatMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPFormatMigration.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* AppIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIdentityTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000000E /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
@@ -264,6 +269,7 @@
 		A2000000000000000000005A /* Phase37TemplateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase37TemplateTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000005C /* Phase38FormatEvolutionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase38FormatEvolutionTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000005E /* Phase39LineChainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase39LineChainTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000060 /* Phase40ArcTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase40ArcTests.swift; sourceTree = "<group>"; };
 		A3000000000000000000001E /* LayerPanelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerPanelUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000020 /* PerformanceHUDUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceHUDUITests.swift; sourceTree = "<group>"; };
 		A30000000000000000000022 /* Phase23SmokeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase23SmokeUITests.swift; sourceTree = "<group>"; };
@@ -396,6 +402,7 @@
 				A10000000000000000000028 /* FFMatrices.swift */,
 				A10000000000000000000029 /* FFGeometry.swift */,
 				A1000000000000000000002E /* FFCurves.swift */,
+				A100000000000000000000A8 /* FFArcs.swift */,
 				A10000000000000000000030 /* FFMeshes.swift */,
 				A10000000000000000000032 /* FFTessellation.swift */,
 			);
@@ -455,6 +462,7 @@
 				A1000000000000000000009C /* FFMetadata.swift */,
 				A100000000000000000000A0 /* FFDocumentTemplates.swift */,
 				A100000000000000000000A4 /* FFLineChainTool.swift */,
+				A100000000000000000000AA /* FFArcTool.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
@@ -516,6 +524,7 @@
 				A2000000000000000000005A /* Phase37TemplateTests.swift */,
 				A2000000000000000000005C /* Phase38FormatEvolutionTests.swift */,
 				A2000000000000000000005E /* Phase39LineChainTests.swift */,
+				A20000000000000000000060 /* Phase40ArcTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -744,6 +753,8 @@
 				A100000000000000000000A1 /* FFPFormatMigration.swift in Sources */,
 				A100000000000000000000A3 /* FFLineChainTool.swift in Sources */,
 				A100000000000000000000A5 /* FFLineChainOverlay.swift in Sources */,
+				A100000000000000000000A7 /* FFArcs.swift in Sources */,
+				A100000000000000000000A9 /* FFArcTool.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -791,6 +802,7 @@
 				A20000000000000000000059 /* Phase37TemplateTests.swift in Sources */,
 				A2000000000000000000005B /* Phase38FormatEvolutionTests.swift in Sources */,
 				A2000000000000000000005D /* Phase39LineChainTests.swift in Sources */,
+				A2000000000000000000005F /* Phase40ArcTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
