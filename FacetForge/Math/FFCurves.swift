@@ -456,9 +456,15 @@ struct NURBSCurve2D: Equatable, Sendable {
         let point = controlPoints[index]
         let nextPoint = controlPoints[nextIndex]
         let scale = Double(degree) / denominator
-        let dx = scale * (nextPoint.x * nextWeight - point.x * weight)
-        let dy = scale * (nextPoint.y * nextWeight - point.y * weight)
-        let dw = scale * (nextWeight - weight)
+        // The neighbour is forward of the start and backward of the end, so the
+        // end's difference is negated to keep both derivatives pointing along
+        // the direction of travel. Without the sign the end tangent runs
+        // backwards, which puts an offset on the wrong side of the curve and a
+        // curvature-comb tip on the wrong normal.
+        let sign: Double = atStart ? 1 : -1
+        let dx = sign * scale * (nextPoint.x * nextWeight - point.x * weight)
+        let dy = sign * scale * (nextPoint.y * nextWeight - point.y * weight)
+        let dw = sign * scale * (nextWeight - weight)
         return Vec2(
             x: (dx - point.x * dw) / weight,
             y: (dy - point.y * dw) / weight

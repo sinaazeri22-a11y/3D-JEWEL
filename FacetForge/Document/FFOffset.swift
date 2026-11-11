@@ -231,7 +231,16 @@ enum FFOffset {
                 )
                 if !added.isEmpty { cornerCount += 1 }
                 points.append(contentsOf: added)
-                points.append(contentsOf: spanned[index].dropFirst())
+                // A fill stops short of the departing point: an arc's interior
+                // points end one chord before it, and a miter or inner
+                // intersection lies on the outgoing leg. Dropping the departing
+                // point here would splice the last corner sample straight to the
+                // span's far end, cutting the corner across the band.
+                if added.isEmpty {
+                    points.append(contentsOf: spanned[index].dropFirst())
+                } else {
+                    points.append(contentsOf: spanned[index])
+                }
             }
         }
 
