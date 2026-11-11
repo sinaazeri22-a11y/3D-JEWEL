@@ -40,6 +40,30 @@ extension FFDocument {
         return node.id
     }
 
+    /// Appends a library cross-section as one ordinary closed curve node.
+    ///
+    /// The payload is validated before the node exists, so the document cannot
+    /// hold a section that failed to build. The node carries no profile record:
+    /// what opens is the exact curve, edited afterwards by the same control
+    /// points as any other payload, which is what keeps the file format and the
+    /// canonical hash unchanged.
+    @discardableResult
+    mutating func addProfile(
+        _ profile: FFRingProfile,
+        name: String,
+        layerID: UUID? = nil
+    ) -> UUID? {
+        guard let payload = try? profile.payload() else { return nil }
+        let node = FFNode(
+            name: uniqueNodeName(name),
+            geometry: .curve(payload),
+            kind: .curve,
+            layerID: layerID ?? currentLayerID
+        )
+        rootNodes.append(node)
+        return node.id
+    }
+
     /// Applies one parameter edit and regenerates the payload in the same
     /// mutation, so undo restores the old parameters and the old geometry
     /// together. The node's transform is untouched, which is what keeps a

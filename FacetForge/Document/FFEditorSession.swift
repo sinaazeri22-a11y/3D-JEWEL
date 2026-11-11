@@ -2208,6 +2208,33 @@ final class FFEditorSession: ObservableObject {
         }
     }
 
+    // MARK: - Profile library
+
+    /// Opens a library cross-section as one closed curve node. One `perform`
+    /// means one undo step and the same journal and autosave path as every
+    /// other edit; the node it selects is the curve the profile became, not a
+    /// parametric record, so the next command edits ordinary control points.
+    @discardableResult
+    func insertProfile(_ kind: FFRingProfileKind) -> UUID? {
+        let profile = FFRingProfile(kind: kind)
+        var created: UUID?
+        let changed = documentSession.perform("Add \(kind.label)") { document in
+            created = document.addProfile(
+                profile,
+                name: kind.label,
+                layerID: document.currentLayerID
+            )
+        }
+        guard changed, let created else {
+            documentStatus = "Could not add \(kind.label)"
+            return nil
+        }
+        selection.select([created])
+        syncDocumentState()
+        documentStatus = "\(kind.label) · \(profile.summary(unit: documentSession.document.displayUnit))"
+        return created
+    }
+
     // MARK: - Interchange
 
     /// Imports a parsed OBJ as one undoable document edit. Materials and nodes
