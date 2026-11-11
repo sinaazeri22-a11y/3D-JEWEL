@@ -95,6 +95,9 @@ final class FFEditorSession: ObservableObject {
     /// corner counts plus what the feature-size filter and the loop remover
     /// trimmed. The offset curve itself is an ordinary document node.
     @Published private(set) var lastOffsetReport: FFOffsetReport?
+    /// What the last corner fillet or chamfer changed, for the inspector to
+    /// show and for a test to prove the fit numbers without re-deriving them.
+    @Published private(set) var lastCornerReport: FFCornerReport?
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -1997,6 +2000,86 @@ final class FFEditorSession: ObservableObject {
             selection.select([created])
             finishCurveEdit(status: "Offset curve · \(result.report.summary)")
             return created
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return nil
+        }
+    }
+
+    /// Replaces one corner of a curve with a fillet arc or a chamfer cut.
+    ///
+    /// Trimming commits one edit to the selected node, so one undo restores the
+    /// original corner exactly. Keeping the original instead commits one new
+    /// sibling node that holds only the arc or the chamfer span, which is what a
+    /// jeweller sweeps afterwards, and leaves the source byte-identical. The
+    /// treatment is resolved before the commit, so a radius or distance that
+    /// does not fit inside its legs creates no history entry and no broken
+    /// curve. The returned id is the changed node, or the created one when the
+    /// original is kept.
+    @discardableResult
+    func treatCurveCorner(
+        nodeID: UUID,
+        corner: Int,
+        treatment: FFCornerTreatment,
+        keepingOriginal: Bool = false
+    ) -> UUID? {
+        guard prepareCurveEdit(nodeID: nodeID) else { return nil }
+        guard let source = documentSession.document.node(withID: nodeID),
+              let payload = source.geometry?.curve
+        else {
+            curveEditMessage = "Select a curve before treating its corner"
+            return nil
+        }
+        guard let location = documentSession.document.location(of: nodeID) else {
+            curveEditMessage = "Select a curve before treating its corner"
+            return nil
+        }
+
+        do {
+            let outcome = try payload.treatingCorner(corner, with: treatment)
+            let action = "\(outcome.report.label) corner"
+
+            if keepingOriginal {
+                let name = nextCurveName(base: treatment.nodeName)
+                var created: UUID?
+                let changed = try documentSession.perform(action) { document in
+                    var node = source
+                    node.id = UUID()
+                    node.name = name
+                    node.geometry = .curve(outcome.treatment)
+                    node.curvePrimitive = nil
+                    node.children = []
+                    guard document.insertNode(
+                        node,
+                        into: location.parent,
+                        at: location.index + 1
+                    ) else {
+                        throw FFCornerError.emptyCurve
+                    }
+                    created = node.id
+                }
+                guard changed, let created else {
+                    curveEditMessage = "That corner could not be treated"
+                    return nil
+                }
+                lastCornerReport = outcome.report
+                selection.select([created])
+                finishCurveEdit(status: outcome.report.summary)
+                return created
+            }
+
+            let changed = try documentSession.perform(action) { document in
+                _ = try document.editCurvePayload(nodeID: nodeID, { $0 = outcome.payload })
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+            }
+            guard changed else {
+                curveEditMessage = "That corner could not be treated"
+                return nil
+            }
+            lastCornerReport = outcome.report
+            selection.select([nodeID])
+            finishCurveEdit(status: outcome.report.summary)
+            return nodeID
         } catch {
             curveEditMessage = Self.curveMessage(for: error)
             return nil
