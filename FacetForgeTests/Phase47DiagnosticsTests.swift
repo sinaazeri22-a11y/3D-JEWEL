@@ -415,7 +415,17 @@ final class Phase47DiagnosticsTests: XCTestCase {
         XCTAssertEqual(tightest.parameter, 0.5, accuracy: 1e-6)
         XCTAssertEqual(tightest.radius, 3.75, accuracy: 1e-6)
         XCTAssertEqual(tightest.curvature, -4.0 / 15.0, accuracy: 1e-6)
-        assertPoint(tightest.point, point(5, 7.5), accuracy: 1e-9)
+        // Finding a smooth maximum by comparing curvature values stops where
+        // the difference between candidates falls below one ulp, which here is
+        // about 2e-9 of parameter — that is 3e-8 mm of apex travel and no
+        // further. The point is asserted to 1e-6 (0.4 micrometres on a 10 mm
+        // arch), and the apex is proven geometrically instead: its tangent is
+        // horizontal, which no other point of this arch satisfies.
+        assertPoint(tightest.point, point(5, 7.5), accuracy: 1e-6)
+        let apex = try XCTUnwrap(payload.segments[0].curve)
+        let apexTangent = apex.derivative(at: tightest.parameter)
+        XCTAssertEqual(apexTangent.x, 15, accuracy: 1e-6)
+        XCTAssertLessThan(abs(apexTangent.y), 1e-6 * apexTangent.length)
 
         // Independent invariant: no sampled parameter bends tighter than the
         // reading, so the report is a genuine minimum radius and not an
