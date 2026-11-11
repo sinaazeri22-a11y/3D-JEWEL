@@ -91,6 +91,10 @@ final class FFEditorSession: ObservableObject {
     /// "G1" rather than merely "joined", and it stays readable after the
     /// command returns so a readout never has to re-measure the seam.
     @Published private(set) var lastCurveJoinReport: FFCurveJoinReport?
+    /// Phase 45's last offset, in the numbers a panel can show: point and
+    /// corner counts plus what the feature-size filter and the loop remover
+    /// trimmed. The offset curve itself is an ordinary document node.
+    @Published private(set) var lastOffsetReport: FFOffsetReport?
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -1931,6 +1935,71 @@ final class FFEditorSession: ObservableObject {
         } catch {
             curveEditMessage = Self.curveMessage(for: error)
             return false
+        }
+    }
+
+    /// Offsets one curve by a signed distance in its own sketch plane and adds
+    /// the result as a new sibling node. The source keeps its geometry, layer,
+    /// transform and parametric record; the offset is a plain polyline payload,
+    /// so nothing about the file format or schema moves. A positive distance
+    /// offsets to the left of the direction of travel and a negative one to the
+    /// right, matching the kernel's normals. The offset is computed before the
+    /// commit, so a refused distance, tolerance or fold creates no history.
+    @discardableResult
+    func offsetCurve(
+        nodeID: UUID,
+        by distance: Double,
+        corner: FFOffsetCorner = .round,
+        tolerance: Double = FFOffset.tolerance
+    ) -> UUID? {
+        guard prepareCurveEdit(nodeID: nodeID) else { return nil }
+        guard let source = documentSession.document.node(withID: nodeID),
+              let payload = source.geometry?.curve
+        else {
+            curveEditMessage = "Select a curve before offsetting it"
+            return nil
+        }
+        guard let location = documentSession.document.location(of: nodeID) else {
+            curveEditMessage = "Select a curve before offsetting it"
+            return nil
+        }
+
+        let name = nextCurveName(base: "Offset")
+        do {
+            let result = try FFOffset.offset(
+                payload,
+                by: distance,
+                corner: corner,
+                tolerance: tolerance
+            )
+            var created: UUID?
+            let changed = try documentSession.perform("Offset curve") { document in
+                var node = source
+                node.id = UUID()
+                node.name = name
+                node.geometry = .curve(result.payload)
+                node.curvePrimitive = nil
+                node.children = []
+                guard document.insertNode(
+                    node,
+                    into: location.parent,
+                    at: location.index + 1
+                ) else {
+                    throw FFOffsetError.emptyCurve
+                }
+                created = node.id
+            }
+            guard changed, let created else {
+                curveEditMessage = "That curve could not be offset"
+                return nil
+            }
+            lastOffsetReport = result.report
+            selection.select([created])
+            finishCurveEdit(status: "Offset curve · \(result.report.summary)")
+            return created
+        } catch {
+            curveEditMessage = Self.curveMessage(for: error)
+            return nil
         }
     }
 
