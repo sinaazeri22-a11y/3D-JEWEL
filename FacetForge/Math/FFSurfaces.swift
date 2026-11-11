@@ -173,7 +173,7 @@ extension FFSpatialCurve {
         var points: [Vec3] = []
         for segment in payload.segments {
             guard let curve = segment.curve,
-                  let flattened = FFTessellation.tessellate(curve, settings: settings)
+                  let flattened = Tessellator.tessellate(curve, settings: settings)
             else { return nil }
             for point in flattened.points {
                 let world = plane.embed(point)
@@ -489,7 +489,7 @@ struct FFRevolutionSurface: Equatable, Sendable {
         // what the surface actually has to reproduce, so the check uses them
         // rather than control points, which may stand off a rational span.
         var smallest = Double.infinity
-        var largest = -.infinity
+        var largest = -Double.infinity
         for segment in profile.payload.segments {
             guard let curve = segment.curve else { throw FFRevolutionError.emptyProfile }
             for step in 0...4 {
@@ -512,7 +512,7 @@ struct FFRevolutionSurface: Equatable, Sendable {
         }
 
         var lowest = Double.infinity
-        var highest = -.infinity
+        var highest = -Double.infinity
         var rising = false
         var falling = false
         var previousHeight: Double?
