@@ -224,7 +224,11 @@ enum FFCurveCleanup {
         )
     }
 
-    private static func signedCurvature(
+    /// The signed curvature at one parameter, from a derivative the caller
+    /// already has. Internal because the diagnostics readout measures the same
+    /// quantity: a seam's label and a min-radius report must not be able to
+    /// disagree about what the curvature is.
+    static func signedCurvature(
         _ curve: Curve2D,
         at parameter: Double,
         derivative: Vec2
