@@ -210,10 +210,11 @@ struct FFLineChainDraft: Equatable, Sendable {
     }
 }
 
-/// Turns a viewport tap into a sketch-plane point. A snap wins when one is
-/// within finger tolerance; otherwise the tap is cast onto the world XY plane
-/// (z = 0), the plane a first sketch is drawn on. A tap that neither snaps nor
-/// reaches the plane is refused rather than inventing a point.
+/// Turns a viewport tap into a point on a sketch plane. A snap wins when one is
+/// within finger tolerance; otherwise the tap's ray is cast onto `plane`, which
+/// defaults to the world XY plane a first sketch is drawn on. Phase 50 passes the
+/// plane a sketch is locked to, so the same snapping and the same refusal serve
+/// both tools instead of a second placement rule existing beside this one.
 enum FFLineChainPlacement {
     static let fingerTolerance: Double = 12
 
@@ -222,6 +223,7 @@ enum FFLineChainPlacement {
         scene: FFViewportScene,
         camera: FFCamera,
         viewport: Vec2,
+        plane: FFPlane3D = .ground,
         draftPoints: [Vec2] = [],
         tolerance: Double = FFLineChainPlacement.fingerTolerance
     ) -> Vec2? {
@@ -233,7 +235,7 @@ enum FFLineChainPlacement {
         // the first vertex would land somewhere near it and never close the
         // loop, because closing is an exact identity on the stored point.
         for point in draftPoints {
-            let world = Vec3(x: point.x, y: point.y, z: 0)
+            let world = plane.embed(point)
             guard let screen = camera.screenPoint(for: world, viewport: viewport) else { continue }
             if (tap - screen).length <= tolerance {
                 return point
@@ -252,17 +254,11 @@ enum FFLineChainPlacement {
             viewport: viewport,
             tolerance: tolerance
         ) {
-            return Vec2(x: result.best.position.x, y: result.best.position.y)
+            return plane.coordinates(of: result.best.position)
         }
 
-        guard let ray = camera.ray(at: tap, viewport: viewport),
-              abs(ray.direction.z) > FFMath.eps
-        else { return nil }
-        let distance = -ray.origin.z / ray.direction.z
-        guard distance > 0, distance.isFinite else { return nil }
-        let hit = ray.point(at: distance)
-        guard hit.x.isFinite, hit.y.isFinite else { return nil }
-        return Vec2(x: hit.x, y: hit.y)
+        guard let ray = camera.ray(at: tap, viewport: viewport) else { return nil }
+        return plane.sketchPoint(of: ray)
     }
 }
 

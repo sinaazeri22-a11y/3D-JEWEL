@@ -71,6 +71,23 @@ final class FFEditorSession: ObservableObject {
     /// The last arc-tool hint or refusal, so a rejected construction explains
     /// itself instead of silently dropping the tap.
     @Published private(set) var arcToolMessage: String?
+    /// Phase 50's work-plane definition and the sketch locked to it. Both are
+    /// transient tool values: a sketch curve is an ordinary curve node placed by
+    /// an ordinary transform, so the document has no work-plane field and the
+    /// format needs no revision.
+    @Published private(set) var sketchPlaneDraft = FFSketchPlaneDraft()
+    @Published private(set) var sketchDraft = FFSketchDraft()
+    /// The last sketch hint or refusal, so a rejected plane or tap explains
+    /// itself instead of leaving the tool silently where it was.
+    @Published private(set) var sketchToolMessage: String?
+    /// How many curves the open sketch has committed. Status only; the document
+    /// stays the owner of the curves themselves.
+    @Published private(set) var committedSketchCurves = 0
+    /// The coalescing key every curve of one sketch shares, and the undo depth
+    /// the sketch started at. Together they are what makes cancelling a sketch
+    /// exactly one undo: the whole sketch occupies one history step.
+    private var sketchCoalescingKey: String?
+    private var sketchUndoDepth = 0
     /// Phase 42's live freehand stroke and its two fit controls. The draft is
     /// transient tool state; the committed spline is an ordinary curve node,
     /// so the document has no freehand-specific field or format.
@@ -1066,6 +1083,7 @@ final class FFEditorSession: ObservableObject {
         migrationReport = nil
         cancelLineChain()
         cancelArc()
+        discardSketch()
         isDirty = false
         autosaveMessage = nil
         documentStatus = "New document"
@@ -1087,6 +1105,7 @@ final class FFEditorSession: ObservableObject {
         migrationReport = nil
         cancelLineChain()
         cancelArc()
+        discardSketch()
         isDirty = false
         autosaveMessage = nil
         documentStatus = "Fixture loaded"
@@ -1393,6 +1412,248 @@ final class FFEditorSession: ObservableObject {
 
     private static func arcMessage(for error: Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+    }
+
+    // MARK: - Sketch plane tool (Phase 50)
+
+    /// The plane a view should resolve taps against while a sketch is locked.
+    /// `nil` means taps resolve against the ground plane as every earlier tool
+    /// does, so the shell needs no second placement path.
+    var lockedSketchPlane: FFPlane3D? { sketchDraft.plane }
+
+    /// The stroke drawn but not yet committed, in world space, for a view to
+    /// draw. Empty when nothing is pending. Display only: the committed payload
+    /// is the plane's coordinates and stays exact.
+    var sketchPreview: [Vec3] { sketchDraft.preview }
+
+    /// The plane the definition draft has resolved, if it has.
+    var sketchPlane: FFPlane3D? { sketchPlaneDraft.plane }
+
+    /// Starts a plane definition. Choosing a mode replaces an unfinished one
+    /// rather than mixing two sources.
+    func beginSketchPlane(_ mode: FFSketchPlaneDraft.Mode) {
+        sketchPlaneDraft.begin(mode)
+        sketchToolMessage = nil
+    }
+
+    /// Defines the plane from a face, an axis or three points given up front.
+    /// A refusal leaves the draft where it was and says why.
+    @discardableResult
+    func defineSketchPlane(_ source: FFWorkPlaneSource) -> Bool {
+        do {
+            switch source {
+            case .face(let origin, let normal):
+                let plane = try sketchPlaneDraft.takeFace(origin: origin, normal: normal)
+                finishSketchPlaneDefinition(plane, source: "face")
+            case .axis(let origin, let direction):
+                let plane = try sketchPlaneDraft.takeAxis(origin: origin, direction: direction)
+                finishSketchPlaneDefinition(plane, source: "axis")
+            case .threePoints(let first, let second, let third):
+                sketchPlaneDraft.begin(.threePoints)
+                _ = try sketchPlaneDraft.add(first)
+                _ = try sketchPlaneDraft.add(second)
+                let plane = try sketchPlaneDraft.add(third)
+                guard let plane else {
+                    sketchToolMessage = "Those three points did not define a plane"
+                    return false
+                }
+                finishSketchPlaneDefinition(plane, source: "three points")
+            }
+            return true
+        } catch {
+            sketchToolMessage = Self.sketchMessage(for: error)
+            return false
+        }
+    }
+
+    /// One tap of a three-point definition. The third accepted point completes
+    /// the plane; a refused tap is removed again so the user can retap.
+    @discardableResult
+    func tapSketchPlanePoint(_ point: Vec3) -> Bool {
+        let before = sketchPlaneDraft.tapCount
+        do {
+            let completed = try sketchPlaneDraft.add(point)
+            if let completed {
+                finishSketchPlaneDefinition(completed, source: "three points")
+            } else {
+                sketchToolMessage = "Point \(sketchPlaneDraft.tapCount) of 3 · \(3 - sketchPlaneDraft.tapCount) more define the plane"
+            }
+            return sketchPlaneDraft.tapCount > before
+        } catch {
+            sketchToolMessage = Self.sketchMessage(for: error)
+            return false
+        }
+    }
+
+    private func finishSketchPlaneDefinition(_ plane: FFPlane3D, source: String) {
+        sketchToolMessage = nil
+        documentStatus = "Work plane · \(source) · \(Self.planeDescription(plane))"
+    }
+
+    /// Locks the sketch to the resolved plane and starts its history step.
+    @discardableResult
+    func lockSketch() -> Bool {
+        guard let plane = sketchPlaneDraft.plane else {
+            sketchToolMessage = "Define a work plane before locking the sketch"
+            return false
+        }
+        guard !sketchDraft.isLocked else {
+            sketchToolMessage = "A sketch is already locked to a plane"
+            return false
+        }
+        sketchDraft.lock(on: plane)
+        sketchCoalescingKey = "sketch-\(UUID().uuidString)"
+        sketchUndoDepth = documentSession.undoDepth
+        committedSketchCurves = 0
+        sketchToolMessage = nil
+        documentStatus = "Sketch locked · \(Self.planeDescription(plane))"
+        return true
+    }
+
+    /// One vertex, already resolved to the locked plane's coordinates. `nil`
+    /// means the tap's ray never met the plane; that is stated, never swallowed.
+    @discardableResult
+    func tapSketch(at point: Vec2?) -> Bool {
+        guard let point else {
+            sketchToolMessage = FFWorkPlaneError.unreachablePlane.errorDescription
+            return false
+        }
+        do {
+            let closed = try sketchDraft.add(point)
+            sketchToolMessage = closed ? "Stroke closed · press Finish" : nil
+            return true
+        } catch {
+            sketchToolMessage = Self.sketchMessage(for: error)
+            return false
+        }
+    }
+
+    /// Commits the stroke as one curve node in the locked plane.
+    ///
+    /// One `perform` carries the node, with the sketch's coalescing key, so the
+    /// whole sketch is one undo step and the journal and autosave see ordinary
+    /// edits. The node's transform is the plane's frame, which is why the curve
+    /// lands in that plane without a plane field in the document.
+    @discardableResult
+    func finishSketchCurve() -> Bool {
+        guard sketchDraft.isLocked, let plane = sketchDraft.plane else {
+            sketchToolMessage = FFWorkPlaneError.sketchNotLocked.errorDescription
+            return false
+        }
+        guard sketchDraft.isActive else {
+            sketchToolMessage = "Tap the locked plane to start a sketch curve"
+            return false
+        }
+        do {
+            let payload = try sketchDraft.payload()
+            let name = nextCurveName(base: "Sketch curve")
+            let placement = plane.nodePlacement
+            let changed = documentSession.perform(
+                "Sketch curve",
+                coalescingKey: sketchCoalescingKey
+            ) { document in
+                document.rootNodes.append(FFNode(
+                    name: name,
+                    transform: placement,
+                    geometry: .curve(payload),
+                    kind: .curve,
+                    layerID: document.currentLayerID
+                ))
+            }
+            guard changed else { return false }
+            sketchDraft.clearStroke()
+            committedSketchCurves += 1
+            syncDocumentState()
+            sketchToolMessage = nil
+            documentStatus = "Sketch curve · \(payload.segments.count) segments on the locked plane"
+            return true
+        } catch {
+            sketchToolMessage = Self.sketchMessage(for: error)
+            return false
+        }
+    }
+
+    /// Keeps what the sketch committed and closes the mode. The curves are
+    /// already document state, so this writes nothing and creates no history.
+    @discardableResult
+    func commitSketch() -> Bool {
+        guard sketchDraft.isLocked else {
+            sketchToolMessage = "No sketch is open"
+            return false
+        }
+        let count = committedSketchCurves
+        sketchDraft.cancel()
+        sketchPlaneDraft.cancel()
+        sketchCoalescingKey = nil
+        sketchUndoDepth = documentSession.undoDepth
+        committedSketchCurves = 0
+        sketchToolMessage = nil
+        documentStatus = count == 0
+            ? "Sketch closed"
+            : "Sketch kept · \(count) curve\(count == 1 ? "" : "s") in one history step"
+        return true
+    }
+
+    /// Cancels the sketch by removing all of its geometry in exactly one undo.
+    ///
+    /// Every curve the sketch committed shares one coalescing key, so the whole
+    /// sketch is a single history step. If another edit split that step, the tool
+    /// says so rather than undoing work the user did not cancel.
+    @discardableResult
+    func cancelSketch() -> Bool {
+        guard sketchDraft.isLocked else {
+            sketchToolMessage = "No sketch is open"
+            return false
+        }
+        let count = committedSketchCurves
+        let endedInOneStep = documentSession.undoDepth == sketchUndoDepth + 1
+            && documentSession.undoName == "Sketch curve"
+        sketchDraft.cancel()
+        sketchPlaneDraft.cancel()
+        sketchCoalescingKey = nil
+        committedSketchCurves = 0
+        guard count > 0 else {
+            sketchUndoDepth = documentSession.undoDepth
+            sketchToolMessage = nil
+            documentStatus = "Sketch cancelled · nothing was kept"
+            return true
+        }
+        guard endedInOneStep, documentSession.undo() else {
+            sketchUndoDepth = documentSession.undoDepth
+            syncDocumentState()
+            sketchToolMessage = "Another edit split this sketch; undo its curves one at a time"
+            return false
+        }
+        sketchUndoDepth = documentSession.undoDepth
+        syncDocumentState()
+        sketchToolMessage = nil
+        documentStatus = "Sketch cancelled · \(count) curve\(count == 1 ? "" : "s") removed by one undo"
+        return true
+    }
+
+    /// Drops sketch tool state without touching history. A locked plane must not
+    /// survive into another document.
+    private func discardSketch() {
+        sketchDraft.cancel()
+        sketchPlaneDraft.cancel()
+        sketchCoalescingKey = nil
+        committedSketchCurves = 0
+        sketchToolMessage = nil
+        sketchUndoDepth = documentSession.undoDepth
+    }
+
+    private static func sketchMessage(for error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription
+            ?? "The sketch command could not be applied"
+    }
+
+    /// A plane in the words the status line uses: where its origin is.
+    private static func planeDescription(_ plane: FFPlane3D) -> String {
+        let origin = plane.origin
+        return "origin "
+            + [origin.x, origin.y, origin.z]
+                .map { FFPrecision.lengthString(millimetres: $0, unit: .millimetres) }
+                .joined(separator: ", ")
     }
 
     // MARK: - Freehand tool
@@ -2383,6 +2644,7 @@ final class FFEditorSession: ObservableObject {
         migrationReport = loaded.migration
         cancelLineChain()
         cancelArc()
+        discardSketch()
         selection = FFSelectionState.initial(for: scene)
         isDirty = false
         lastAutosaveAt = nil
