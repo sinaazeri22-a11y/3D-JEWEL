@@ -448,6 +448,7 @@
 				A100000000000000000000B1 /* FFFreehand.swift */,
 				A10000000000000000000030 /* FFMeshes.swift */,
 				A10000000000000000000032 /* FFTessellation.swift */,
+				A100000000000000000000C2 /* FFSurfaces.swift */,
 			);
 			path = Math;
 			sourceTree = "<group>";
@@ -513,7 +514,6 @@
 				A100000000000000000000BB /* FFOffset.swift */,
 				A100000000000000000000BD /* FFCornerTreatments.swift */,
 				A100000000000000000000C0 /* FFCurveDiagnostics.swift */,
-				A100000000000000000000C2 /* FFSurfaces.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
