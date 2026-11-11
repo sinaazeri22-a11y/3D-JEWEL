@@ -185,24 +185,31 @@ final class Phase48ProjectionTests: XCTestCase {
         }
     }
 
-    /// The row's acceptance is a round-trip under 1e-5 mm; an affine pair is
-    /// exact to arithmetic noise, so the same measurement also proves the tighter
-    /// claim that nothing is refitted.
+    /// The row's acceptance is a projection round trip under 1e-5 mm. A plane
+    /// projection is affine and idempotent, so the round trip it claims is
+    /// payload -> space -> payload on the target plane: embed the projected
+    /// curve, read it back into coordinates, rebuild it and evaluate it again.
+    /// Projecting onto a second, non-parallel plane is a projection composition
+    /// rather than an inverse, so it is deliberately not the claim here.
     func testProjectionRoundTripStaysInsideTheRowsBudget() throws {
         let tilted = try plane(point3(-4, 3, 2), point3(1, 2, -1))
         let curve = FFSpatialCurve(payload: try circle(point(2, -1), radius: 11), plane: .ground)
         let there = try XCTUnwrap(curve.projected(onto: tilted))
-        let back = try XCTUnwrap(there.projected(onto: .ground))
+        let rebuilt = try XCTUnwrap(there.projected(onto: tilted))
 
         var worst = 0.0
         for step in 0...256 {
             let u = Double(step) / 64
-            let before = try XCTUnwrap(curve.point(atGlobal: u))
-            let after = try XCTUnwrap(back.point(atGlobal: u))
-            worst = max(worst, before.distance(to: after))
+            let first = try XCTUnwrap(there.point(atGlobal: u))
+            XCTAssertTrue(
+                tilted.contains(first, tolerance: 1e-12),
+                "a projected point must lie on its plane, u = \(u)"
+            )
+            let second = try XCTUnwrap(rebuilt.point(atGlobal: u))
+            worst = max(worst, first.distance(to: second))
         }
         XCTAssertLessThan(worst, 1e-5, "the row's budget is 1e-5 mm")
-        XCTAssertLessThan(worst, 1e-9, "an affine round trip is exact to arithmetic noise")
+        XCTAssertLessThan(worst, 1e-12, "an affine projection is idempotent to arithmetic noise")
     }
 
     func testProjectionPreservesWeightsDegreeAndKnots() throws {
