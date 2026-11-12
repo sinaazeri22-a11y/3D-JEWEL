@@ -259,12 +259,20 @@ struct IndexedMesh: Equatable, Sendable {
             oriented = false
         }
 
+        // Outgoing half-edges are bucketed once, in ascending half-edge order,
+        // which is exactly the order the per-vertex filter produced. Filtering
+        // the whole half-edge array for every vertex is quadratic in mesh size:
+        // on a 55k-vertex, 110k-triangle ring sweep that is ~9 billion
+        // comparisons, measured at 240.0 s on the gate runner and 248.8 s on a
+        // loaded one. The bucket makes the pass O(vertices + half-edges) without
+        // changing a single predicate below.
+        var outgoingByVertex = [[Int]](repeating: [], count: positions.count)
+        for (index, halfEdge) in halfEdges.enumerated() {
+            outgoingByVertex[halfEdge.origin].append(index)
+        }
+
         var nonManifoldVertexCount = 0
-        for vertex in positions.indices {
-            let outgoing = halfEdges.indices.filter {
-                halfEdges[$0].origin == vertex
-            }
-            guard outgoing.count > 1 else { continue }
+        for outgoing in outgoingByVertex where outgoing.count > 1 {
 
             var parent = Array(0..<outgoing.count)
             func root(_ value: Int) -> Int {
