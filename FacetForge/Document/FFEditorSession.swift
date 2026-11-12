@@ -115,6 +115,14 @@ final class FFEditorSession: ObservableObject {
     /// What the last corner fillet or chamfer changed, for the inspector to
     /// show and for a test to prove the fit numbers without re-deriving them.
     @Published private(set) var lastCornerReport: FFCornerReport?
+    /// Phase 51's last constraint solve: the applied set, the degrees of freedom
+    /// it left, the residual it reached and the constraint it refused. The
+    /// constrained polyline is document state; this is the record of how it was
+    /// reached, so a panel can show DOF without re-solving.
+    @Published private(set) var lastSketchConstraintSolution: FFSketchConstraintSolution?
+    /// The reason a constraint set was not applied. A refused set writes no
+    /// history, so it must say why it left the sketch alone.
+    @Published private(set) var sketchConstraintMessage: String?
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -2264,6 +2272,58 @@ final class FFEditorSession: ObservableObject {
         } catch {
             curveEditMessage = Self.curveMessage(for: error)
             return nil
+        }
+    }
+
+    /// Applies a Phase 51 constraint set to one sketch.
+    ///
+    /// The solver runs on a value copy first, so a set the solver refuses — an
+    /// over-constrained sketch, a segment index that is not there, a tangency
+    /// between neighbours that share no vertex — creates no history entry and
+    /// leaves the stored payload byte-identical. A solved set is committed as
+    /// one `perform`, so one undo restores the sketch exactly as it was drawn.
+    /// The constrained sketch is an ordinary polyline payload: the same straight
+    /// spans the sketch tool already writes, with no field the format did not
+    /// have before.
+    @discardableResult
+    func constrainCurve(nodeID: UUID, constraints: [FFSketchConstraint]) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        guard let payload = documentSession.document.curvePayload(forNodeID: nodeID) else {
+            return false
+        }
+
+        do {
+            let polyline = try FFSketchPolyline(payload: payload)
+            let solution = try FFSketchConstraintSolver.solve(polyline, constraints: constraints)
+            lastSketchConstraintSolution = solution
+            guard solution.isSatisfied else {
+                let refused = solution.conflicts.first?.label ?? "one of those constraints"
+                sketchConstraintMessage = "That set over-constrains this sketch at: \(refused)"
+                return false
+            }
+
+            let changed = try documentSession.perform("Constrain sketch") { document in
+                _ = try document.editCurvePayload(
+                    nodeID: nodeID,
+                    { $0 = solution.polyline.payload() }
+                )
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+            }
+            guard changed else {
+                sketchConstraintMessage = "That sketch already satisfies those constraints"
+                return false
+            }
+            sketchConstraintMessage = nil
+            let count = constraints.count
+            let noun = count == 1 ? "constraint" : "constraints"
+            finishCurveEdit(
+                status: "Sketch constrained · \(count) \(noun) · "
+                    + "DOF \(solution.degreesOfFreedom)"
+            )
+            return true
+        } catch {
+            sketchConstraintMessage = Self.curveMessage(for: error)
+            return false
         }
     }
 
