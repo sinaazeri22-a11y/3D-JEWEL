@@ -209,13 +209,25 @@ struct FFSnapResult: Equatable, Sendable {
 enum FFSnapResolver {
     static let defaultTolerance: Double = 8
 
+    /// How far off a sketch plane a candidate may sit and still be accepted as
+    /// one of its vertices. Mesh vertices on the plane are already exact to
+    /// arithmetic noise, so this only has to exclude points that are genuinely
+    /// somewhere else.
+    static let planeTolerance: Double = 1e-6
+
+    /// `on` restricts every candidate to points that lie in that plane. A planar
+    /// sketch cannot hold a vertex that is not in its plane: flattening one into
+    /// the plane's coordinates would store a point different from the marker the
+    /// user aimed at. The default accepts every candidate, so the hover markers
+    /// and the measuring tool keep their unwindowed vocabulary.
     static func resolve(
         hover: Vec2,
         reference: Vec3?,
         geometry: FFSnapGeometry,
         camera: FFCamera,
         viewport: Vec2,
-        tolerance: Double = defaultTolerance
+        tolerance: Double = defaultTolerance,
+        on plane: FFPlane3D? = nil
     ) -> FFSnapResult? {
         guard viewport.x > FFMath.eps, viewport.y > FFMath.eps,
               hover.x.isFinite, hover.y.isFinite, tolerance > 0
@@ -227,6 +239,9 @@ enum FFSnapResolver {
             guard let screen = camera.screenPoint(for: position, viewport: viewport),
                   screen.x.isFinite, screen.y.isFinite
             else { return }
+            if let plane, abs(plane.signedDistance(of: position)) > Self.planeTolerance {
+                return
+            }
             let distance = (hover - screen).length
             guard distance <= tolerance else { return }
             if let current = byKind[kind], current.distance <= distance { return }

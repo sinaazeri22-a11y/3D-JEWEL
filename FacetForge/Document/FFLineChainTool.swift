@@ -246,13 +246,20 @@ enum FFLineChainPlacement {
             of: scene,
             selectedIDs: Set(scene.nodes.filter(\.isVisible).map(\.id))
         )
+        // Snaps are restricted to the target plane. A planar sketch cannot hold
+        // a vertex that is not in its plane, so a candidate from somewhere else —
+        // the world Y-up grid, a vertex on a neighbouring face — is refused here
+        // instead of being flattened into coordinates the user never aimed at.
+        // On the ground plane the grid lies outside it too, which is why the line
+        // tool resolves to the plane hit rather than to an off-plane grid point.
         if let result = FFSnapResolver.resolve(
             hover: tap,
             reference: nil,
             geometry: geometry,
             camera: camera,
             viewport: viewport,
-            tolerance: tolerance
+            tolerance: tolerance,
+            on: plane
         ) {
             return plane.coordinates(of: result.best.position)
         }

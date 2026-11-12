@@ -359,9 +359,14 @@ final class Phase50SketchPlaneTests: XCTestCase {
         let payload = try XCTUnwrap(node.geometry?.curve)
         XCTAssertEqual(payload.segments.count, 2)
         XCTAssertFalse(payload.isClosed)
+        // Each segment stores both of its own endpoints, so a three-vertex chain
+        // is two segments holding four control points and the middle vertex is
+        // stored twice. The first version of this test assumed one control point
+        // per vertex and asserted three; that premise was wrong, not the kernel.
         let stored = payload.segments.flatMap { $0.controlPoints.map(\.vector) }
-        XCTAssertEqual(stored.count, 3)
-        for (index, tap) in taps.enumerated() {
+        XCTAssertEqual(stored.count, 4)
+        let expectedStored = [taps[0], taps[1], taps[1], taps[2]]
+        for (index, tap) in expectedStored.enumerated() {
             XCTAssertEqual(stored[index].x, tap.x, accuracy: 1e-9)
             XCTAssertEqual(stored[index].y, tap.y, accuracy: 1e-9)
         }
@@ -388,6 +393,36 @@ final class Phase50SketchPlaneTests: XCTestCase {
 
         XCTAssertTrue(session.defineSketchPlane(.face(origin: plane.origin, normal: plane.normal)))
         XCTAssertTrue(session.lockSketch())
+
+        // The fixture is deliberately inside the grid's reach, so this test
+        // cannot pass vacuously. Measured in a local model of this camera and
+        // plane: a world Y-up grid point 2.0 mm off the locked plane projects
+        // 2.63 pt from the first tap, inside the 12 pt finger tolerance. Without
+        // the plane restriction the resolver answers it (`unconstrained`); with
+        // the restriction it answers nothing and the placement falls through to
+        // the exact ray-plane hit.
+        let originScreen = try XCTUnwrap(camera.screenPoint(for: plane.origin, viewport: viewport))
+        let geometry = FFSnapGeometry.features(of: .empty, selectedIDs: [])
+        let unconstrained = try XCTUnwrap(FFSnapResolver.resolve(
+            hover: originScreen,
+            reference: nil,
+            geometry: geometry,
+            camera: camera,
+            viewport: viewport,
+            tolerance: FFLineChainPlacement.fingerTolerance
+        ))
+        XCTAssertEqual(unconstrained.best.kind, .grid)
+        XCTAssertGreaterThan(abs(plane.signedDistance(of: unconstrained.best.position)), 1)
+        XCTAssertNil(FFSnapResolver.resolve(
+            hover: originScreen,
+            reference: nil,
+            geometry: geometry,
+            camera: camera,
+            viewport: viewport,
+            tolerance: FFLineChainPlacement.fingerTolerance,
+            on: plane
+        ))
+
         for tap in taps {
             let world = plane.embed(tap)
             let screen = try XCTUnwrap(camera.screenPoint(for: world, viewport: viewport))
