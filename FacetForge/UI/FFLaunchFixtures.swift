@@ -201,4 +201,113 @@ enum FFLaunchFixtures {
         try? journal.record(moved, at: Date().addingTimeInterval(-1))
         return url
     }
+
+    // MARK: - Curve library
+
+    static var wantsCurveLibraryDemo: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFCurveLibraryFixture")
+    }
+
+    static var wantsCurveLibraryReopen: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFCurveLibraryReopen")
+    }
+
+    /// A deterministic start for the library test: the saved-curve file is
+    /// removed, then a document with one named curve opens through the real
+    /// reader. A save during the test therefore has to write the file.
+    static func prepareCurveLibraryDocument() -> URL? {
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: documents.appendingPathComponent(FFCurveLibrary.fileName))
+        return writeCurveLibraryDocument(
+            named: "Phase55 Source.ffp",
+            title: "Curve library source",
+            node: "Library source",
+            in: documents
+        )
+    }
+
+    /// The same library, an empty document. Nothing here touches the saved
+    /// curves, so a curve in the tree after this launch came from the library.
+    static func prepareCurveLibraryTarget() -> URL? {
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        return writeCurveLibraryDocument(
+            named: "Phase55 Target.ffp",
+            title: "Curve library target",
+            node: nil,
+            in: documents
+        )
+    }
+
+    /// One document, optionally holding one three-span open curve. The spans
+    /// are written as the payload a document stores, so the geometry the test
+    /// saves is geometry a user could have drawn rather than a test-only
+    /// outline, and one span is a weighted NURBS so weights, degree and knots
+    /// all have to survive the round trip.
+    private static func writeCurveLibraryDocument(
+        named fileName: String,
+        title: String,
+        node nodeName: String?,
+        in documents: URL
+    ) -> URL? {
+        let url = documents.appendingPathComponent(fileName)
+        try? FileManager.default.removeItem(at: url)
+        var document = FFDocument(name: title)
+        if let nodeName {
+            let start = Vec2(x: -18, y: -12)
+            let peak = Vec2(x: 0, y: 16)
+            let end = Vec2(x: 20, y: -10)
+            let first = FFCurveSegment(
+                kind: .bezier,
+                controlPoints: [
+                    FFPoint2(start),
+                    FFPoint2(Vec2(x: -11, y: 4)),
+                    FFPoint2(peak)
+                ]
+            )
+            let second = FFCurveSegment(
+                kind: .nurbs,
+                controlPoints: [
+                    FFPoint2(peak),
+                    FFPoint2(Vec2(x: 7, y: 13)),
+                    FFPoint2(end)
+                ],
+                weights: [1, 0.75, 1],
+                degree: 2,
+                knots: [0, 0, 0.5, 1, 1]
+            )
+            let third = FFCurveSegment(
+                kind: .bezier,
+                controlPoints: [FFPoint2(end), FFPoint2(Vec2(x: 2, y: -14))]
+            )
+            document.rootNodes.append(FFNode(
+                name: nodeName,
+                geometry: .curve(FFCurvePayload(
+                    segments: [first, second, third],
+                    isClosed: false
+                )),
+                kind: .curve,
+                layerID: document.currentLayerID
+            ))
+        }
+        guard (try? FFDocumentStore().save(
+            document,
+            to: url,
+            thumbnail: FFPThumbnail.png(for: document)
+        )) != nil else {
+            return nil
+        }
+        return url
+    }
 }

@@ -71,6 +71,12 @@ final class FFEditorSession: ObservableObject {
     /// The last arc-tool hint or refusal, so a rejected construction explains
     /// itself instead of silently dropping the tap.
     @Published private(set) var arcToolMessage: String?
+    /// Phase 55's saved curves, read from the container's `CurveLibrary.json`.
+    /// The library is outside the document, so saving to it is not an undo step
+    /// and inserting from it is an ordinary document edit.
+    @Published private(set) var curveLibraryEntries: [FFCurveLibraryEntry] = []
+    /// The last library refusal or confirmation, shown in the card.
+    @Published private(set) var curveLibraryMessage: String?
     /// Phase 50's work-plane definition and the sketch locked to it. Both are
     /// transient tool values: a sketch curve is an ordinary curve node placed by
     /// an ordinary transform, so the document has no work-plane field and the
@@ -2937,6 +2943,80 @@ final class FFEditorSession: ObservableObject {
         selection.select([created])
         syncDocumentState()
         documentStatus = "\(kind.label) · \(profile.summary(unit: documentSession.document.displayUnit))"
+        return created
+    }
+
+    // MARK: - Curve library
+
+    /// Where `CurveLibrary.json` lives. The shipping app uses the document
+    /// container beside the documents; a test points it at a scratch directory.
+    var curveLibraryDirectory: URL = FFEditorSession.documentsDirectory
+
+    var curveLibrary: FFCurveLibrary {
+        FFCurveLibrary(directory: curveLibraryDirectory)
+    }
+
+    /// Re-reads the file, so the card lists what is on disk and a relaunch sees
+    /// the same entries through the same call.
+    func reloadCurveLibrary() {
+        curveLibraryEntries = curveLibrary.entries()
+    }
+
+    /// Saves the first selected curve into the user's library. Nothing is
+    /// committed: the library is not the document, so this cannot create an
+    /// undo step or dirty the file being edited.
+    @discardableResult
+    func saveSelectedCurveToLibrary(name: String, tags: String) -> Bool {
+        guard let nodeID = selection.selectedIDs.first,
+              let node = documentSession.document.node(withID: nodeID),
+              let payload = node.geometry?.curve else {
+            curveLibraryMessage = "Select a curve before saving it"
+            return false
+        }
+        do {
+            let entry = try curveLibrary.save(
+                payload,
+                name: name,
+                tags: FFCurveLibrary.tags(from: tags)
+            )
+            reloadCurveLibrary()
+            curveLibraryMessage = "Saved \(entry.name)"
+            documentStatus = "Saved \(entry.name) to the curve library"
+            return true
+        } catch {
+            curveLibraryMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Inserts a saved curve as one document edit. The payload is copied as it
+    /// was stored, so the new node's spans, weights, degree and knots are the
+    /// saved ones, and one undo takes the node away again.
+    @discardableResult
+    func insertLibraryCurve(_ entryID: UUID) -> UUID? {
+        guard let entry = curveLibrary.entry(withID: entryID) else {
+            curveLibraryMessage = FFCurveLibraryError.missingEntry.errorDescription
+            return nil
+        }
+        var created: UUID?
+        let changed = documentSession.perform("Insert \(entry.name)") { document in
+            let node = FFNode(
+                name: document.uniqueNodeName(entry.name),
+                geometry: .curve(entry.payload),
+                kind: .curve,
+                layerID: document.currentLayerID
+            )
+            document.rootNodes.append(node)
+            created = node.id
+        }
+        guard changed, let created else {
+            curveLibraryMessage = "Could not insert \(entry.name)"
+            return nil
+        }
+        selection.select([created])
+        syncDocumentState()
+        curveLibraryMessage = "Inserted \(entry.name)"
+        documentStatus = "Inserted \(entry.name) · \(entry.payload.segments.count) spans"
         return created
     }
 

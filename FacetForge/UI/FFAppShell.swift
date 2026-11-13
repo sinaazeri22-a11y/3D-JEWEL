@@ -219,6 +219,12 @@ struct FFAppShell: View {
     /// so the Surface tool has something real to preview. The shipping app
     /// leaves it false.
     var launchSurfaceDemo: Bool = false
+    /// Test surface: clears the curve library and opens a document with one
+    /// curve to save. The shipping app leaves it false.
+    var launchCurveLibraryDemo: Bool = false
+    /// Test surface: opens an empty document and leaves the curve library
+    /// alone, so any curve in the tree can only come from a saved entry.
+    var launchCurveLibraryReopen: Bool = false
     var onOpenGallery: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
@@ -349,6 +355,15 @@ struct FFAppShell: View {
                         onSurfaceAngleDrag: { _ = session.dragSurfacePreviewAngle(byDegrees: $0) },
                         surfacePreview: session.surfacePreview,
                         surfaceMessage: session.surfacePreviewMessage,
+                        curveLibrary: session.curveLibraryEntries,
+                        curveLibraryMessage: session.curveLibraryMessage,
+                        onReloadCurveLibrary: { session.reloadCurveLibrary() },
+                        onSaveCurveToLibrary: { name, tags in
+                            _ = session.saveSelectedCurveToLibrary(name: name, tags: tags)
+                        },
+                        onInsertLibraryCurve: { entryID in
+                            _ = session.insertLibraryCurve(entryID)
+                        },
                         onPerformance: { performance = $0 },
                         onShowTools: { toolsCollapsed = false },
                         onShowInspector: { inspectorCollapsed = false }
@@ -472,6 +487,12 @@ struct FFAppShell: View {
                     try? session.reopen(from: url)
                 }
                 if launchSurfaceDemo, let url = FFLaunchFixtures.prepareSurfaceDocument() {
+                    try? session.reopen(from: url)
+                }
+                if launchCurveLibraryDemo, let url = FFLaunchFixtures.prepareCurveLibraryDocument() {
+                    try? session.reopen(from: url)
+                }
+                if launchCurveLibraryReopen, let url = FFLaunchFixtures.prepareCurveLibraryTarget() {
                     try? session.reopen(from: url)
                 }
                 session.startAutosave()
@@ -728,6 +749,11 @@ private struct FFViewport: View {
     let onSurfaceAngleDrag: (Double) -> Void
     let surfacePreview: FFSurfacePreview?
     let surfaceMessage: String?
+    let curveLibrary: [FFCurveLibraryEntry]
+    let curveLibraryMessage: String?
+    let onReloadCurveLibrary: () -> Void
+    let onSaveCurveToLibrary: (String, String) -> Void
+    let onInsertLibraryCurve: (UUID) -> Void
     let onPerformance: (FFPerformanceReport) -> Void
     let onShowTools: () -> Void
     let onShowInspector: () -> Void
@@ -1039,6 +1065,11 @@ private struct FFViewport: View {
                     isSurfacing: isSurfacing,
                     surfacePreview: surfacePreview,
                     surfaceMessage: surfaceMessage,
+                    curveLibrary: curveLibrary,
+                    curveLibraryMessage: curveLibraryMessage,
+                    onReloadCurveLibrary: onReloadCurveLibrary,
+                    onSaveCurveToLibrary: onSaveCurveToLibrary,
+                    onInsertLibraryCurve: onInsertLibraryCurve,
                     onSurfaceMode: onSurfaceMode,
                     onSurfaceDrag: onSurfaceDrag,
                     onSurfaceAngleDrag: onSurfaceAngleDrag,
@@ -1122,6 +1153,11 @@ private struct FFViewport: View {
             isSurfacing: false,
             surfacePreview: nil,
             surfaceMessage: nil,
+            curveLibrary: [],
+            curveLibraryMessage: nil,
+            onReloadCurveLibrary: {},
+            onSaveCurveToLibrary: { _, _ in },
+            onInsertLibraryCurve: { _ in },
             onSurfaceMode: { _ in },
             onSurfaceDrag: { _ in },
             onSurfaceAngleDrag: { _ in },
@@ -1200,6 +1236,11 @@ private struct FFViewportPane: View {
     let isSurfacing: Bool
     let surfacePreview: FFSurfacePreview?
     let surfaceMessage: String?
+    let curveLibrary: [FFCurveLibraryEntry]
+    let curveLibraryMessage: String?
+    let onReloadCurveLibrary: () -> Void
+    let onSaveCurveToLibrary: (String, String) -> Void
+    let onInsertLibraryCurve: (UUID) -> Void
     let onSurfaceMode: (FFSweepMode) -> Void
     let onSurfaceDrag: (Double) -> Void
     let onSurfaceAngleDrag: (Double) -> Void
@@ -1211,6 +1252,9 @@ private struct FFViewportPane: View {
     @State private var snapMarkers: [FFSnapMarker] = []
     @State private var hoverPoint: Vec2?
     @State private var paneSize = CGSize(width: 1, height: 1)
+    /// The library card is pane UI state: opening it edits nothing, and it is
+    /// mounted only while it is open.
+    @State private var curveLibraryOpen = false
     /// The viewport publishes hover before pick on a tap; a reference box keeps
     /// that sample readable inside the pick callback without a SwiftUI state
     /// round-trip.
@@ -1219,6 +1263,11 @@ private struct FFViewportPane: View {
     /// The four-up panes are camera previews, not editing surfaces. The gizmo
     /// lives in the maximised Perspective pane, the one a document opens in.
     private var showsGumball: Bool { metalIdentifier == "shell.viewport.metal" }
+
+    /// True while another bottom-leading card owns the corner. The library
+    /// chip and card both step aside, and opening a tool closes the card so two
+    /// panels can never share the corner.
+    private var curvePanelBlocked: Bool { isSurfacing || isMeasuring || isDrawingLines }
 
     private var selectionScene: FFViewportScene {
         selection.applying(to: scene)
@@ -1435,6 +1484,53 @@ private struct FFViewportPane: View {
                     .padding(.leading, FFSpace.sm)
                     .padding(.bottom, 72)
                 }
+                if showsGumball, curveLibraryOpen, !curvePanelBlocked {
+                    FFCurveLibraryPanel(
+                        entries: curveLibrary,
+                        message: curveLibraryMessage,
+                        onSave: onSaveCurveToLibrary,
+                        onInsert: onInsertLibraryCurve
+                    )
+                    .padding(.leading, FFSpace.sm)
+                    .padding(.bottom, 124)
+                }
+                // One corner, one control: the chip stays mounted under its own
+                // card so the card can always be closed again, and it steps
+                // aside while a tool panel is showing, so it can neither cover
+                // that panel nor take the taps meant for it.
+                if showsGumball, !curvePanelBlocked {
+                    FFChip(
+                        title: "Curves",
+                        systemImage: "books.vertical",
+                        isSelected: curveLibraryOpen,
+                        accessibilityIdentifier: "shell.curves.toggle"
+                    ) {
+                        if curveLibraryOpen {
+                            curveLibraryOpen = false
+                        } else {
+                            onReloadCurveLibrary()
+                            curveLibraryOpen = true
+                        }
+                    }
+                    .padding(.leading, FFSpace.sm)
+                    .padding(.bottom, 72)
+                }
+            }
+            // A row dragged out of the library card carries the entry's id, so
+            // the drop inserts exactly what was saved, through the same
+            // command the card's Insert chip uses.
+            .dropDestination(for: String.self) { items, _ in
+                guard let first = items.first,
+                      let entryID = UUID(uuidString: first)
+                else { return false }
+                onInsertLibraryCurve(entryID)
+                return true
+            }
+            // A tool that owns the corner closes the library card instead of
+            // drawing under it; the chip comes back with the card's state
+            // already false, so reopening is one tap.
+            .onChange(of: curvePanelBlocked) { _, blocked in
+                if blocked { curveLibraryOpen = false }
             }
             .onGeometryChange(for: CGSize.self) { geometry in
                 geometry.size

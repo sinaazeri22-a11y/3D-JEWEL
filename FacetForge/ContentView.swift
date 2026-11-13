@@ -9,6 +9,8 @@ struct ContentView: View {
             launchBrowserDemo: FFLaunchFixtures.wantsBrowserDemo,
             launchMigrationDemo: FFLaunchFixtures.wantsMigrationDemo,
             launchSurfaceDemo: FFLaunchFixtures.wantsSurfaceDemo,
+            launchCurveLibraryDemo: FFLaunchFixtures.wantsCurveLibraryDemo,
+            launchCurveLibraryReopen: FFLaunchFixtures.wantsCurveLibraryReopen,
             onOpenGallery: { showingGallery = true }
         )
             .background(
