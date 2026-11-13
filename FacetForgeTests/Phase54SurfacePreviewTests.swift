@@ -209,21 +209,28 @@ final class Phase54SurfacePreviewTests: XCTestCase {
         )
         XCTAssertEqual(sweep.steps, 48)
 
-        var durations: [Double] = []
+        var totals: [Double] = []
+        var kernels: [Double] = []
+        var renders: [Double] = []
         for _ in 0..<9 {
             let started = DispatchTime.now().uptimeNanoseconds
             let mesh = try sweep.mesh()
+            let afterKernel = DispatchTime.now().uptimeNanoseconds
             let render = try XCTUnwrap(FFRenderMesh(mesh: mesh))
-            durations.append(
-                Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
-            )
+            let ended = DispatchTime.now().uptimeNanoseconds
+            kernels.append(Double(afterKernel - started) / 1_000_000)
+            renders.append(Double(ended - afterKernel) / 1_000_000)
+            totals.append(Double(ended - started) / 1_000_000)
             XCTAssertEqual(render.triangleCount, 19_200)
         }
-        let median = durations.sorted()[durations.count / 2]
+        let median = totals.sorted()[totals.count / 2]
+        let kernelMedian = kernels.sorted()[kernels.count / 2]
+        let renderMedian = renders.sorted()[renders.count / 2]
         XCTAssertLessThan(
             median,
             16,
-            "one 200-point revolve update took \(median) ms, over the row's budget"
+            "one 200-point revolve update took \(median) ms, over the row's budget "
+                + "(sweep \(kernelMedian) ms, render mesh \(renderMedian) ms)"
         )
     }
 

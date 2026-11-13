@@ -139,12 +139,22 @@ struct IndexedMesh: Equatable, Sendable {
 
     /// Area-weighted vertex normals. A vertex with no non-degenerate incident
     /// face returns the zero vector rather than an arbitrary direction.
+    ///
+    /// A face's area-weighted normal is `normalize(cross) * (|cross| / 2)`, and
+    /// those two factors cancel exactly: `|cross|` is twice the triangle's area,
+    /// so the result is `cross / 2`. Computing it that way costs one cross
+    /// product and one vertex fetch per face instead of two of each plus two
+    /// square roots and three per-axis divisions. `faceNormal`'s tolerance
+    /// survives as the length test that decides whether a face is degenerate.
     func vertexNormals() -> [Vec3] {
         var accumulated = [Vec3](repeating: .zero, count: positions.count)
-        for triangleIndex in triangles.indices {
-            guard let normal = faceNormal(triangleIndex) else { continue }
-            let weighted = normal * triangleArea(triangleIndex)
-            let triangle = triangles[triangleIndex]
+        for triangle in triangles {
+            let a = positions[triangle.a]
+            let b = positions[triangle.b]
+            let c = positions[triangle.c]
+            let cross = (b - a).cross(c - a)
+            guard cross.length > 1e-12 else { continue }
+            let weighted = cross * 0.5
             accumulated[triangle.a] = accumulated[triangle.a] + weighted
             accumulated[triangle.b] = accumulated[triangle.b] + weighted
             accumulated[triangle.c] = accumulated[triangle.c] + weighted

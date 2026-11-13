@@ -3488,18 +3488,23 @@ extension FFEditorSession {
     /// FNV-1a over the vertex positions and the triangle indices. It costs one
     /// pass over the mesh per update, inside the measured rebuild, and it is
     /// what lets the renderer reuse a buffer without trusting a vertex count.
+    ///
+    /// The fields are hashed directly rather than through array literals: a
+    /// three-element array per vertex and per triangle is 28,800 allocations on
+    /// a 9,600-vertex preview, and in an unoptimised build those allocations
+    /// dominated the pass. The hash sequence is unchanged.
     private static func surfaceSignature(of mesh: IndexedMesh) -> UInt64 {
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         let prime: UInt64 = 0x0000_0100_0000_01b3
         for position in mesh.positions {
-            for bits in [position.x.bitPattern, position.y.bitPattern, position.z.bitPattern] {
-                hash = (hash ^ bits) &* prime
-            }
+            hash = (hash ^ position.x.bitPattern) &* prime
+            hash = (hash ^ position.y.bitPattern) &* prime
+            hash = (hash ^ position.z.bitPattern) &* prime
         }
         for triangle in mesh.triangles {
-            for index in triangle.indices {
-                hash = (hash ^ UInt64(index)) &* prime
-            }
+            hash = (hash ^ UInt64(triangle.a)) &* prime
+            hash = (hash ^ UInt64(triangle.b)) &* prime
+            hash = (hash ^ UInt64(triangle.c)) &* prime
         }
         return hash
     }
