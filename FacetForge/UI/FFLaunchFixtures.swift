@@ -285,7 +285,10 @@ enum FFLaunchFixtures {
                 ],
                 weights: [1, 0.75, 1],
                 degree: 2,
-                knots: [0, 0, 0.5, 1, 1]
+                // 3 control points at degree 2 need 3 + 2 + 1 = 6 knots; a
+                // shorter vector makes the segment unrebuildable, so the
+                // saved curve would be bytes rather than geometry.
+                knots: [0, 0, 0, 1, 1, 1]
             )
             let third = FFCurveSegment(
                 kind: .bezier,

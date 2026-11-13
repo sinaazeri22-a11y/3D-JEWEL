@@ -26,6 +26,10 @@ final class Phase55CurveLibraryTests: XCTestCase {
 
     func testASavedCurveReadsBackExactlyFromAFreshLibrary() throws {
         let payload = samplePayload()
+        // The premise every equality below rests on: the fixture is a curve the
+        // kernel can rebuild, not merely numbers that echo back. A NURBS with
+        // the wrong knot count would satisfy an equality and still be nothing.
+        XCTAssertNotNil(payload.path(), "the fixture must be a valid curve")
         let saved = try FFCurveLibrary(directory: directory)
             .save(payload, name: "  Scroll  ", tags: [" scroll ", "Ring"])
 
@@ -67,13 +71,21 @@ final class Phase55CurveLibraryTests: XCTestCase {
         let insertedID = try XCTUnwrap(target.insertLibraryCurve(saved.id))
         let inserted = try XCTUnwrap(target.rootNodes.first { $0.id == insertedID })
         XCTAssertEqual(inserted.geometry?.curve, payload, "the inserted curve is the saved curve")
+        XCTAssertEqual(
+            inserted.geometry?.curve?.path(),
+            payload.path(),
+            "both payloads rebuild the same kernel path"
+        )
 
         let segments = try XCTUnwrap(inserted.geometry?.curve?.segments)
         XCTAssertEqual(segments[0].kind, .bezier)
         XCTAssertEqual(segments[1].kind, .nurbs)
         XCTAssertEqual(segments[1].weights, [1, 0.75, 1])
         XCTAssertEqual(segments[1].degree, 2)
-        XCTAssertEqual(segments[1].knots, [0, 0, 0.5, 1, 1])
+        // degree 2 over 3 control points needs 3 + 2 + 1 = 6 knots, clamped at
+        // both ends; the kernel rejects any other count, so this asserts the
+        // only vector that can rebuild a quadratic.
+        XCTAssertEqual(segments[1].knots, [0, 0, 0, 1, 1, 1])
 
         XCTAssertEqual(target.documentSession.undoDepth, 1, "an insert is exactly one undo step")
         XCTAssertTrue(target.undo())
@@ -170,7 +182,7 @@ final class Phase55CurveLibraryTests: XCTestCase {
                     ],
                     weights: [1, 0.75, 1],
                     degree: 2,
-                    knots: [0, 0, 0.5, 1, 1]
+                    knots: [0, 0, 0, 1, 1, 1]
                 ),
                 FFCurveSegment(
                     kind: .bezier,
