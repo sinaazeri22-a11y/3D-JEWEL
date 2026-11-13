@@ -17,22 +17,51 @@ import Foundation
 /// Gauss-Newton step slides a rectangle toward that apex, which a local model
 /// measured as a 10 mm rectangle collapsing to a 0.007 mm square.
 enum FFSketchConstraint: Equatable, Sendable {
+    // Phase 51: the four chain constraints.
     case horizontal(segment: Int)
     case vertical(segment: Int)
     case equalLength(first: Int, second: Int)
     case tangent(first: Int, second: Int)
 
+    // Phase 52: the system constraints.
+    //
+    // `coincident` and `distance` name anchors rather than points, because a
+    // circle's centre is a place a dimension can start or end. The chain solver
+    // has no circles and no such anchors, so it refuses these seven kinds with a
+    // sentence instead of inventing an interpretation for them.
+    case coincident(FFSketchAnchor, FFSketchAnchor)
+    case perpendicular(first: Int, second: Int)
+    case parallel(first: Int, second: Int)
+    case concentric(first: Int, second: Int)
+    case distance(FFSketchAnchor, FFSketchAnchor, Double)
+    case radius(circle: Int, Double)
+    case angle(first: Int, second: Int, Double)
+
     /// A sentence a readout or a refusal can carry.
     var label: String {
         switch self {
         case .horizontal(let segment):
-            return "Horizontal on segment \(segment)"
+            return "Horizontal on segment \(segment + 1)"
         case .vertical(let segment):
-            return "Vertical on segment \(segment)"
+            return "Vertical on segment \(segment + 1)"
         case .equalLength(let first, let second):
-            return "Equal length on segments \(first) and \(second)"
+            return "Equal length on segments \(first + 1) and \(second + 1)"
         case .tangent(let first, let second):
-            return "Tangent on segments \(first) and \(second)"
+            return "Tangent on segments \(first + 1) and \(second + 1)"
+        case .coincident(let first, let second):
+            return "Coincident \(first.label) and \(second.label)"
+        case .perpendicular(let first, let second):
+            return "Perpendicular on segments \(first + 1) and \(second + 1)"
+        case .parallel(let first, let second):
+            return "Parallel on segments \(first + 1) and \(second + 1)"
+        case .concentric(let first, let second):
+            return "Concentric circles \(first + 1) and \(second + 1)"
+        case .distance(let first, let second, let value):
+            return "Distance \(value) mm from \(first.label) to \(second.label)"
+        case .radius(let circle, let value):
+            return "Radius \(value) mm on circle \(circle + 1)"
+        case .angle(let first, let second, let degrees):
+            return "Angle \(degrees)° between segments \(first + 1) and \(second + 1)"
         }
     }
 }
@@ -52,6 +81,18 @@ enum FFSketchConstraintError: Error, Equatable, LocalizedError {
     case coincidentSketch
     case noConstraints
 
+    // Phase 52: the system solver's structural refusals.
+    case pointOutOfRange(Int)
+    case circleOutOfRange(Int)
+    case anchorOutOfRange(String)
+    case anchorRepeatsItself(String)
+    case segmentRepeatsItself(String)
+    case degenerateSegment(Int)
+    case nonPositiveDimension(String)
+    case angleOutOfRange(Double)
+    case systemHasNoGeometry
+    case chainSolverCannotSolve(String)
+
     var errorDescription: String? {
         switch self {
         case .segmentOutOfRange(let index):
@@ -66,6 +107,26 @@ enum FFSketchConstraintError: Error, Equatable, LocalizedError {
             return "Every point of that sketch is in the same place, so there is no shape to constrain"
         case .noConstraints:
             return "Choose at least one constraint"
+        case .pointOutOfRange(let index):
+            return "Point \(index + 1) is not part of that sketch"
+        case .circleOutOfRange(let index):
+            return "Circle \(index + 1) is not part of that sketch"
+        case .anchorOutOfRange(let label):
+            return "\(label) is not part of that sketch"
+        case .anchorRepeatsItself(let label):
+            return "\(label) cannot be constrained to itself"
+        case .segmentRepeatsItself(let label):
+            return "\(label) needs two different segments"
+        case .degenerateSegment(let index):
+            return "Segment \(index + 1) has no length, so it has no direction to constrain"
+        case .nonPositiveDimension(let label):
+            return "\(label) must be greater than zero"
+        case .angleOutOfRange(let degrees):
+            return "An angle of \(degrees)° is outside the range this solver works in"
+        case .systemHasNoGeometry:
+            return "That sketch has no points or circles to constrain"
+        case .chainSolverCannotSolve(let label):
+            return "\(label) needs the system solver, not the chain solver"
         }
     }
 }
@@ -294,6 +355,10 @@ enum FFSketchConstraintSolver {
                 guard endsFirst?.end == endsSecond?.start else {
                     throw FFSketchConstraintError.tangentNeedsNeighbour(first, second)
                 }
+            case .coincident, .perpendicular, .parallel, .concentric, .distance, .radius, .angle:
+                // These name anchors or circles the chain model does not have,
+                // so they are refused here rather than reinterpreted.
+                throw FFSketchConstraintError.chainSolverCannotSolve(constraint.label)
             }
         }
     }
@@ -534,6 +599,9 @@ enum FFSketchConstraintSolver {
                         value: cosine * crossRowTail.y - sine * dotRowTail.y
                     ),
                 ])
+            case .coincident, .perpendicular, .parallel, .concentric, .distance, .radius, .angle:
+                // Unreachable: `validate` refuses these before an attempt runs.
+                return nil
             }
         }
         return Evaluation(residuals: residuals, rows: rows)
@@ -618,7 +686,7 @@ enum FFSketchConstraintSolver {
     }
 
     /// Gaussian elimination with partial pivoting on the normal equations.
-    private static func solveLinear(_ matrix: [[Double]], rhs: [Double]) -> [Double]? {
+    static func solveLinear(_ matrix: [[Double]], rhs: [Double]) -> [Double]? {
         let n = rhs.count
         guard matrix.count == n else { return nil }
         var augmented = matrix

@@ -120,6 +120,9 @@ final class FFEditorSession: ObservableObject {
     /// constrained polyline is document state; this is the record of how it was
     /// reached, so a panel can show DOF without re-solving.
     @Published private(set) var lastSketchConstraintSolution: FFSketchConstraintSolution?
+    /// Phase 52's last system solve, including the degrees of freedom a readout
+    /// would show. Nil until a system constraint set has been attempted.
+    @Published private(set) var lastSketchSystemSolution: FFSketchSystemSolution?
     /// The reason a constraint set was not applied. A refused set writes no
     /// history, so it must say why it left the sketch alone.
     @Published private(set) var sketchConstraintMessage: String?
@@ -2308,6 +2311,84 @@ final class FFEditorSession: ObservableObject {
                     { $0 = solution.polyline.payload() }
                 )
                 Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+            }
+            guard changed else {
+                sketchConstraintMessage = "That sketch already satisfies those constraints"
+                return false
+            }
+            sketchConstraintMessage = nil
+            let count = constraints.count
+            let noun = count == 1 ? "constraint" : "constraints"
+            finishCurveEdit(
+                status: "Sketch constrained · \(count) \(noun) · "
+                    + "DOF \(solution.degreesOfFreedom)"
+            )
+            return true
+        } catch {
+            sketchConstraintMessage = Self.curveMessage(for: error)
+            return false
+        }
+    }
+
+    /// Applies a Phase 52 constraint set to one sketch or one circle.
+    ///
+    /// A polyline node is read as points and spans; a circle primitive is read
+    /// as its centre and radius. Reading a circle that way is what lets a radius
+    /// or a concentric constraint change it without ever letting the four stored
+    /// quarter spans stop being circular: the payload is regenerated from the
+    /// solved centre and radius, not moved control point by control point.
+    ///
+    /// The solver runs on a value copy first, so a set it refuses — an anchor
+    /// that is not there, a span that has collapsed, an over-constrained set —
+    /// creates no history entry and leaves the stored payload byte-identical.
+    /// A solved set is committed as one `perform`, so one undo restores the
+    /// sketch exactly as it was.
+    @discardableResult
+    func constrainSketch(nodeID: UUID, constraints: [FFSketchConstraint]) -> Bool {
+        guard prepareCurveEdit(nodeID: nodeID) else { return false }
+        guard let node = documentSession.document.node(withID: nodeID) else { return false }
+
+        do {
+            let circlePrimitive: FFCurvePrimitive? = {
+                guard let primitive = node.curvePrimitive, primitive.kind == .circle else {
+                    return nil
+                }
+                return primitive
+            }()
+
+            let system: FFSketchSystem
+            if let primitive = circlePrimitive {
+                system = FFSketchSystem(circle: primitive)
+            } else if let payload = node.geometry?.curve {
+                system = FFSketchSystem(polyline: try FFSketchPolyline(payload: payload))
+            } else {
+                sketchConstraintMessage = "Select a sketch or a circle before constraining it"
+                return false
+            }
+
+            let solution = try FFSketchSystemSolver.solve(system, constraints: constraints)
+            lastSketchSystemSolution = solution
+            guard solution.isSatisfied else {
+                let refused = solution.conflicts.first?.label ?? "one of those constraints"
+                sketchConstraintMessage = "That set over-constrains this sketch at: \(refused)"
+                return false
+            }
+
+            let changed = try documentSession.perform("Constrain sketch") { document in
+                if circlePrimitive != nil {
+                    guard let solved = solution.system.circles.first else { return }
+                    _ = document.setPrimitive(nodeID) { primitive in
+                        primitive.center = FFPoint2(solved.centre)
+                        primitive.radius = solved.radius
+                        return true
+                    }
+                } else {
+                    _ = try document.editCurvePayload(
+                        nodeID: nodeID,
+                        { $0 = solution.system.polyline().payload() }
+                    )
+                    Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+                }
             }
             guard changed else {
                 sketchConstraintMessage = "That sketch already satisfies those constraints"
