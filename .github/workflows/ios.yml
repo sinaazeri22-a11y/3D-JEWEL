@@ -40,7 +40,12 @@ jobs:
     # boot a simulator and then timed out ordinary UI snapshots, so the gate is
     # back on arm64. If capacity cancels again, fall back to Intel deliberately
     # and record the run id rather than polling the queue.
-    runs-on: macos-26
+    #
+    # 2026-11-13: five runner_id-0 zero-step cancellations in a row (runs
+    # 43438083035 attempts 1-3 and 43444594498 attempts 1-3, each queued for
+    # exactly 15 minutes and cancelled without a step), so the Phase 55 gate
+    # takes the recorded fallback below.
+    runs-on: macos-26-intel
     timeout-minutes: 45
     env:
       PROJECT: FacetForge.xcodeproj
