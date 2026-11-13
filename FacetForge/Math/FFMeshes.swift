@@ -75,14 +75,26 @@ struct IndexedMesh: Equatable, Sendable {
     let triangles: [MeshTriangle]
 
     init?(positions: [Vec3], triangles: [MeshTriangle]) {
-        guard positions.allSatisfy({ position in
-            position.x.isFinite && position.y.isFinite && position.z.isFinite
-        }) else { return nil }
+        for position in positions {
+            guard position.x.isFinite, position.y.isFinite, position.z.isFinite else {
+                return nil
+            }
+        }
 
+        // The three indices must be in range and pairwise distinct. Reading the
+        // fields and comparing them is the same predicate as building a Set per
+        // triangle, but a swept preview constructs 19,200 triangles per drag
+        // event, and that Set plus the `MeshTriangle.indices` array it fed were
+        // 38,400 allocations per mesh — more than the geometry itself.
+        let count = positions.count
         for triangle in triangles {
-            let indices = triangle.indices
-            guard indices.allSatisfy({ $0 >= 0 && $0 < positions.count }) else { return nil }
-            guard Set(indices).count == 3 else { return nil }
+            let a = triangle.a
+            let b = triangle.b
+            let c = triangle.c
+            guard a >= 0, a < count, b >= 0, b < count, c >= 0, c < count else {
+                return nil
+            }
+            guard a != b, a != c, b != c else { return nil }
         }
 
         self.positions = positions
@@ -159,7 +171,12 @@ struct IndexedMesh: Equatable, Sendable {
             accumulated[triangle.b] = accumulated[triangle.b] + weighted
             accumulated[triangle.c] = accumulated[triangle.c] + weighted
         }
-        return accumulated.map { $0.normalized() ?? .zero }
+        var normals: [Vec3] = []
+        normals.reserveCapacity(accumulated.count)
+        for normal in accumulated {
+            normals.append(normal.normalized() ?? .zero)
+        }
+        return normals
     }
 
     /// The signed volume of the closed surface, positive for outward winding.
