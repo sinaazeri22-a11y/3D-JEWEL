@@ -43,13 +43,15 @@ jobs:
     #
     # 2026-11-13: thirteen runner_id-0 zero-step cancellations across five runs
     # (each queued exactly 15 minutes, never given a runner), so the Phase 55
-    # gate takes the fallback deliberately. Intel run 43455338992 got a runner
-    # at once and was tracking to about an hour against a 45-minute cap, so this
-    # attempt raises the job ceiling instead of letting it be killed again: a
-    # slower green is a green, a capped job is not. The label returns to arm64
-    # once this gate has a conclusion; both outcomes stay recorded here.
+    # gate takes the fallback deliberately. Measured, not guessed: Intel run
+    # 43455338992 was killed at 45 minutes; run 43500133294's test step ran
+    # 114 minutes and was still going when the 120-minute ceiling cut it, with
+    # its result bundle incomplete. So the ceiling is 180 minutes, sized from
+    # that measurement with margin: a slower green is a green, a capped job is
+    # not. The label returns to arm64 once this gate has a conclusion; all of
+    # these numbers stay recorded here.
     runs-on: macos-26-intel
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
       PROJECT: FacetForge.xcodeproj
       SCHEME: FacetForge
