@@ -495,6 +495,13 @@ extension FFDocument {
     /// Runs one pure payload edit against a curve node. The document is the
     /// only owner of the stored payload; the caller's closure can only reach it
     /// through this method.
+    ///
+    /// A stored dimension names segments by index, so an edit that changes how
+    /// many segments there are has renumbered them and the records no longer
+    /// describe the curve. Such an edit drops them in the same mutation rather
+    /// than leaving a lock pointing at a different span; a same-topology edit
+    /// (a solve, a control-point move) keeps them, which is what lets a
+    /// dimension keep driving the shape it was added to.
     @discardableResult
     mutating func editCurvePayload(
         nodeID: UUID,
@@ -504,7 +511,12 @@ extension FFDocument {
               let geometry = node.geometry,
               case .curve(var payload) = geometry
         else { return false }
+        let segmentCount = payload.segments.count
         try edit(&payload)
-        return updateNode(withID: nodeID) { $0.geometry = .curve(payload) }
+        let topologyChanged = payload.segments.count != segmentCount
+        return updateNode(withID: nodeID) { target in
+            target.geometry = .curve(payload)
+            if topologyChanged { target.dimensions = nil }
+        }
     }
 }

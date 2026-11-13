@@ -420,6 +420,10 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
     /// schema-1 documents written before Phase 41 still decode; encoding omits
     /// it while nil, so an untouched document's canonical hash does not move.
     var curvePrimitive: FFCurvePrimitive?
+    /// Phase 53's driving dimensions. Optional so schema-1 documents written
+    /// before this field still decode; encoding omits it while nil, so an
+    /// untouched document's canonical hash does not move.
+    var dimensions: [FFDimensionAnnotation]?
     var children: [FFNode]
 
     init(
@@ -435,6 +439,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         array: FFArrayParameters? = nil,
         faceGroups: [FFFaceGroup]? = nil,
         curvePrimitive: FFCurvePrimitive? = nil,
+        dimensions: [FFDimensionAnnotation]? = nil,
         children: [FFNode] = []
     ) {
         self.id = id
@@ -449,6 +454,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         self.array = array
         self.faceGroups = faceGroups
         self.curvePrimitive = curvePrimitive
+        self.dimensions = dimensions
         self.children = children
     }
 

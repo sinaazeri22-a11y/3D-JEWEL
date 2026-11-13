@@ -30,6 +30,20 @@ enum FFSketchAnchor: Equatable, Sendable {
     case point(Int)
     case circleCentre(Int)
 
+    /// The index this anchor names, in its own kind's list.
+    var index: Int {
+        switch self {
+        case .point(let index), .circleCentre(let index):
+            return index
+        }
+    }
+
+    /// Whether this anchor is a circle's centre rather than a point.
+    var isCentre: Bool {
+        if case .circleCentre = self { return true }
+        return false
+    }
+
     var label: String {
         switch self {
         case .point(let index): return "point \(index + 1)"

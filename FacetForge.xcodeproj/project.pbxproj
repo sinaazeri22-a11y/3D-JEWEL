@@ -89,7 +89,9 @@
 		A100000000000000000000C9 /* FFSketchPlaneTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C8 /* FFSketchPlaneTool.swift */; };
 		A100000000000000000000CB /* FFSketchConstraints.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000CA /* FFSketchConstraints.swift */; };
 		A100000000000000000000CD /* FFSketchSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000CC /* FFSketchSystem.swift */; };
+		A100000000000000000000CF /* FFDimensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000CE /* FFDimensions.swift */; };
 		A2000000000000000000007A /* Phase52ConstraintSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000079 /* Phase52ConstraintSystemTests.swift */; };
+		A2000000000000000000007C /* Phase53DrivingDimensionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007B /* Phase53DrivingDimensionTests.swift */; };
 		A100000000000000000000AB /* FFPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AC /* FFPrimitives.swift */; };
 		A100000000000000000000AD /* FFDocumentPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AE /* FFDocumentPrimitives.swift */; };
 		A100000000000000000000A1 /* FFPFormatMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A2 /* FFPFormatMigration.swift */; };
@@ -271,7 +273,9 @@
 		A100000000000000000000C8 /* FFSketchPlaneTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFSketchPlaneTool.swift; sourceTree = "<group>"; };
 		A100000000000000000000CA /* FFSketchConstraints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFSketchConstraints.swift; sourceTree = "<group>"; };
 		A100000000000000000000CC /* FFSketchSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFSketchSystem.swift; sourceTree = "<group>"; };
+		A100000000000000000000CE /* FFDimensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFDimensions.swift; sourceTree = "<group>"; };
 		A20000000000000000000079 /* Phase52ConstraintSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase52ConstraintSystemTests.swift; sourceTree = "<group>"; };
+		A2000000000000000000007B /* Phase53DrivingDimensionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase53DrivingDimensionTests.swift; sourceTree = "<group>"; };
 		A100000000000000000000AC /* FFPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPrimitives.swift; sourceTree = "<group>"; };
 		A100000000000000000000AE /* FFDocumentPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFDocumentPrimitives.swift; sourceTree = "<group>"; };
 		A100000000000000000000A2 /* FFPFormatMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPFormatMigration.swift; sourceTree = "<group>"; };
@@ -537,6 +541,7 @@
 				A100000000000000000000BD /* FFCornerTreatments.swift */,
 				A100000000000000000000C0 /* FFCurveDiagnostics.swift */,
 				A100000000000000000000C8 /* FFSketchPlaneTool.swift */,
+				A100000000000000000000CE /* FFDimensions.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
@@ -611,6 +616,7 @@
 				A20000000000000000000075 /* Phase50SketchPlaneTests.swift */,
 				A20000000000000000000077 /* Phase51SketchConstraintTests.swift */,
 				A20000000000000000000079 /* Phase52ConstraintSystemTests.swift */,
+				A2000000000000000000007B /* Phase53DrivingDimensionTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -858,6 +864,7 @@
 				A100000000000000000000C9 /* FFSketchPlaneTool.swift in Sources */,
 				A100000000000000000000CB /* FFSketchConstraints.swift in Sources */,
 				A100000000000000000000CD /* FFSketchSystem.swift in Sources */,
+				A100000000000000000000CF /* FFDimensions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -918,6 +925,7 @@
 				A20000000000000000000076 /* Phase50SketchPlaneTests.swift in Sources */,
 				A20000000000000000000078 /* Phase51SketchConstraintTests.swift in Sources */,
 				A2000000000000000000007A /* Phase52ConstraintSystemTests.swift in Sources */,
+				A2000000000000000000007C /* Phase53DrivingDimensionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

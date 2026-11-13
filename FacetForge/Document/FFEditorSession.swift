@@ -126,6 +126,13 @@ final class FFEditorSession: ObservableObject {
     /// The reason a constraint set was not applied. A refused set writes no
     /// history, so it must say why it left the sketch alone.
     @Published private(set) var sketchConstraintMessage: String?
+    /// Phase 53's last dimension resolve: the solved sketch, the re-measured
+    /// readouts and the freedom count, so a readout can show what a typed value
+    /// produced without re-solving.
+    @Published private(set) var lastDimensionResolution: FFDimensionResolution?
+    /// The reason a dimension was not added, edited or held. A refused edit
+    /// writes no history, so it must say why it left the sketch alone.
+    @Published private(set) var dimensionMessage: String?
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -1775,14 +1782,48 @@ final class FFEditorSession: ObservableObject {
     ) -> Bool {
         guard prepareCurveEdit(nodeID: nodeID) else { return false }
         let ref = FFCurvePointRef(segment: segment, point: point)
+        // A locked dimension is a hard row even during a drag: the moved point is
+        // the starting guess and the solve keeps every locked value, so a slip of
+        // the finger reshapes the sketch only where the lock allows and can never
+        // change the dimension's number. With no locked dimension this is the
+        // plain point move it was before Phase 53.
+        let locked = (documentSession.document.node(withID: nodeID)?.dimensions ?? [])
+            .filter(\.isLocked)
+        var resolved: FFDimensionResolution?
         do {
             let changed = try documentSession.perform(
                 "Move curve point",
                 coalescingKey: coalescingKey
             ) { document in
-                _ = try document.editCurvePayload(nodeID: nodeID) { payload in
-                    try payload.moveControlPoint(ref, to: location)
+                if locked.isEmpty {
+                    _ = try document.editCurvePayload(nodeID: nodeID) { payload in
+                        try payload.moveControlPoint(ref, to: location)
+                    }
+                    // A readout still follows the geometry it describes: an
+                    // unlocked dimension is re-measured after a plain move, so
+                    // its number never goes stale behind a drag.
+                    try Self.refreshReadouts(in: &document, nodeID: nodeID)
+                    return
                 }
+                guard var moved = document.curvePayload(forNodeID: nodeID) else {
+                    throw FFCurveEditError.invalidCurve(segment: segment)
+                }
+                try moved.moveControlPoint(ref, to: location)
+                let chain = try FFSketchPolyline(payload: moved)
+                let resolution = try FFSketchDimensionResolver.resolve(
+                    FFSketchSystem(polyline: chain),
+                    dimensions: document.dimensionAnnotations(forNodeID: nodeID),
+                    binding: Set(locked.map(\.id))
+                )
+                resolved = resolution
+                _ = try document.editCurvePayload(nodeID: nodeID) {
+                    $0 = resolution.system.polyline().payload()
+                }
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+                _ = try document.editDimensions(nodeID: nodeID) { $0 = resolution.dimensions }
+            }
+            if let resolved {
+                lastDimensionResolution = resolved
             }
             guard changed else {
                 curveEditMessage = "That control point is already there"
@@ -2366,7 +2407,14 @@ final class FFEditorSession: ObservableObject {
                 return false
             }
 
-            let solution = try FFSketchSystemSolver.solve(system, constraints: constraints)
+            // A locked dimension is a hard row of every solve, not only of a
+            // dimension edit: otherwise a Phase 51 constraint could move a
+            // sketch away from a number the record still claims to hold.
+            let locked = (node.dimensions ?? []).filter(\.isLocked).map(\.constraint)
+            let solution = try FFSketchSystemSolver.solve(
+                system,
+                constraints: constraints + locked
+            )
             lastSketchSystemSolution = solution
             guard solution.isSatisfied else {
                 let refused = solution.conflicts.first?.label ?? "one of those constraints"
@@ -2405,6 +2453,240 @@ final class FFEditorSession: ObservableObject {
         } catch {
             sketchConstraintMessage = Self.curveMessage(for: error)
             return false
+        }
+    }
+
+    /// One command for a sketch's stored dimensions.
+    ///
+    /// The three edits share one entry point because they share one commit: a
+    /// dimension is a record on the node and its effect is a payload plus that
+    /// record, so one undo must restore both or neither.
+    enum FFDimensionCommand: Equatable, Sendable {
+        /// Records a dimension at the value the geometry currently measures, so
+        /// adding one never moves the sketch.
+        case add(FFDimensionTarget, isLocked: Bool)
+        /// Types a value and drives the geometry to it through the Phase 52
+        /// solver, holding every locked dimension.
+        case setValue(UUID, Double)
+        /// Makes a dimension binding, driving the geometry to its stored value,
+        /// or turns it back into a readout that follows the geometry.
+        case setLocked(UUID, Bool)
+    }
+
+    /// Applies one dimension edit to a sketch or a circle.
+    ///
+    /// A locked dimension is a hard row: it keeps its value whatever the
+    /// geometry does, and a typed value or a lock arrives by solving rather than
+    /// by writing coordinates, so the freedom count and the residual are the same
+    /// ones any other constraint set gets. An unlocked dimension is a readout and
+    /// is re-measured after every solve, so its number and the shape cannot
+    /// disagree. Every path commits at most one `perform`, so one undo restores
+    /// the payload and the record set together; a refusal creates no history and
+    /// leaves the stored payload byte-identical.
+    @discardableResult
+    func applyDimension(nodeID: UUID, command: FFDimensionCommand) -> Bool {
+        guard let node = documentSession.document.node(withID: nodeID) else { return false }
+        guard !isLocked(nodeID: nodeID) else {
+            dimensionMessage = "That sketch is on a locked layer"
+            return false
+        }
+        guard node.geometry?.curve != nil else {
+            dimensionMessage = FFDimensionError.notASketch.errorDescription
+            return false
+        }
+
+        do {
+            let circlePrimitive: FFCurvePrimitive? = {
+                guard let primitive = node.curvePrimitive, primitive.kind == .circle else {
+                    return nil
+                }
+                return primitive
+            }()
+            let system: FFSketchSystem
+            if let primitive = circlePrimitive {
+                system = FFSketchSystem(circle: primitive)
+            } else if let payload = node.geometry?.curve {
+                system = FFSketchSystem(polyline: try FFSketchPolyline(payload: payload))
+            } else {
+                throw FFDimensionError.notASketch
+            }
+
+            var dimensions = node.dimensions ?? []
+            let unit = documentSession.document.displayUnit
+
+            switch command {
+            case .add(let target, let isLocked):
+                var annotation = FFDimensionAnnotation(
+                    target: target,
+                    value: 0,
+                    isLocked: isLocked
+                )
+                annotation.value = try annotation.measured(in: system)
+                try Self.validate(annotation)
+                dimensions.append(annotation)
+                let changed = try documentSession.perform("Add dimension") { document in
+                    _ = try document.editDimensions(nodeID: nodeID) { $0 = dimensions }
+                }
+                guard changed else {
+                    dimensionMessage = "That dimension is already there"
+                    return false
+                }
+                dimensionMessage = nil
+                let lock = isLocked ? " · locked" : ""
+                finishCurveEdit(status: "Dimension · \(annotation.summary(unit: unit))\(lock)")
+                return true
+
+            case .setValue(let id, let newValue):
+                guard let index = dimensions.firstIndex(where: { $0.id == id }) else {
+                    throw FFDimensionError.unknownDimension
+                }
+                dimensions[index].value = newValue
+                try Self.validate(dimensions[index])
+                return try resolveAndCommit(
+                    system: system,
+                    dimensions: dimensions,
+                    binding: Self.binding(in: dimensions, adding: id),
+                    nodeID: nodeID,
+                    isCircle: circlePrimitive != nil,
+                    action: "Edit dimension",
+                    status: "Dimension · \(dimensions[index].summary(unit: unit))"
+                )
+
+            case .setLocked(let id, let locked):
+                guard let index = dimensions.firstIndex(where: { $0.id == id }) else {
+                    throw FFDimensionError.unknownDimension
+                }
+                dimensions[index].isLocked = locked
+                if locked {
+                    return try resolveAndCommit(
+                        system: system,
+                        dimensions: dimensions,
+                        binding: Self.binding(in: dimensions),
+                        nodeID: nodeID,
+                        isCircle: circlePrimitive != nil,
+                        action: "Lock dimension",
+                        status: "Dimension locked · \(dimensions[index].summary(unit: unit))"
+                    )
+                }
+                let changed = try documentSession.perform("Unlock dimension") { document in
+                    _ = try document.editDimensions(nodeID: nodeID) { $0 = dimensions }
+                }
+                guard changed else {
+                    dimensionMessage = "That dimension was already a readout"
+                    return false
+                }
+                dimensionMessage = nil
+                finishCurveEdit(
+                    status: "Dimension unlocked · \(dimensions[index].summary(unit: unit))"
+                )
+                return true
+            }
+        } catch {
+            dimensionMessage = (error as? LocalizedError)?.errorDescription
+                ?? "The dimension could not be applied"
+            return false
+        }
+    }
+
+    /// Solves and commits, returning whether anything changed.
+    ///
+    /// The payload and the record set are written inside one `perform`, which is
+    /// what keeps a typed value, the shape it produced and the readouts that
+    /// followed it from ever being two undo steps.
+    private func resolveAndCommit(
+        system: FFSketchSystem,
+        dimensions: [FFDimensionAnnotation],
+        binding: Set<UUID>,
+        nodeID: UUID,
+        isCircle: Bool,
+        action: String,
+        status: String
+    ) throws -> Bool {
+        let resolution = try FFSketchDimensionResolver.resolve(
+            system,
+            dimensions: dimensions,
+            binding: binding
+        )
+        let changed = try documentSession.perform(action) { document in
+            if isCircle {
+                if let solved = resolution.system.circles.first {
+                    _ = document.setPrimitive(nodeID) { primitive in
+                        primitive.center = FFPoint2(solved.centre)
+                        primitive.radius = solved.radius
+                        return true
+                    }
+                }
+            } else {
+                _ = try document.editCurvePayload(nodeID: nodeID) {
+                    $0 = resolution.system.polyline().payload()
+                }
+                Self.clearCurvePrimitive(in: &document, nodeID: nodeID)
+            }
+            _ = try document.editDimensions(nodeID: nodeID) { $0 = resolution.dimensions }
+        }
+        lastDimensionResolution = resolution
+        guard changed else {
+            dimensionMessage = "That sketch already satisfies that dimension"
+            return false
+        }
+        dimensionMessage = nil
+        finishCurveEdit(status: "\(status) · DOF \(resolution.degreesOfFreedom)")
+        return true
+    }
+
+    /// Re-measures every unlocked dimension against the node's current payload.
+    ///
+    /// Locked dimensions are left alone: their number is what the geometry must
+    /// meet, not a record of what it happens to be. A payload that cannot be read
+    /// as a polyline leaves the records untouched rather than guessing.
+    private static func refreshReadouts(in document: inout FFDocument, nodeID: UUID) throws {
+        let stored = document.dimensionAnnotations(forNodeID: nodeID)
+        guard stored.contains(where: { !$0.isLocked }) else { return }
+        guard let payload = document.curvePayload(forNodeID: nodeID),
+              let chain = try? FFSketchPolyline(payload: payload)
+        else { return }
+        let system = FFSketchSystem(polyline: chain)
+        var updated = stored
+        for index in updated.indices where !updated[index].isLocked {
+            if let measured = try? updated[index].measured(in: system) {
+                updated[index].value = measured
+            }
+        }
+        guard updated != stored else { return }
+        _ = try document.editDimensions(nodeID: nodeID) { $0 = updated }
+    }
+
+    /// The dimensions a solve must hold: every locked one, plus an edit's own
+    /// target while it is being typed.
+    private static func binding(
+        in dimensions: [FFDimensionAnnotation],
+        adding extra: UUID? = nil
+    ) -> Set<UUID> {
+        var result = Set(dimensions.filter(\.isLocked).map(\.id))
+        if let extra { result.insert(extra) }
+        return result
+    }
+
+    /// A dimension's own rules, stated once so an add and an edit cannot
+    /// disagree about what a valid number is. An angle is the angle two lines
+    /// meet at, which is folded into `0...90`, so a typed 120 is refused here
+    /// instead of being stored and silently measured back as 60.
+    private static func validate(_ dimension: FFDimensionAnnotation) throws {
+        switch dimension.kind {
+        case .distance, .radius:
+            guard dimension.value.isFinite, dimension.value > 0 else {
+                throw FFDimensionError.noPositiveValue(
+                    dimension.kind == .distance ? "A distance" : "A radius"
+                )
+            }
+        case .angle:
+            guard dimension.value.isFinite, dimension.value > 0,
+                  dimension.value <= 90 + 1e-9
+            else {
+                throw FFDimensionError.angleOutOfRange(
+                    dimension.value.isFinite ? dimension.value : 0
+                )
+            }
         }
     }
 
@@ -2450,6 +2732,10 @@ final class FFEditorSession: ObservableObject {
                     node.name = name
                     node.geometry = .curve(outcome.treatment)
                     node.curvePrimitive = nil
+                    // The treatment is a different payload with its own segment
+                    // numbering, so the source's dimension records do not
+                    // describe it.
+                    node.dimensions = nil
                     node.children = []
                     guard document.insertNode(
                         node,
