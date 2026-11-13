@@ -1259,7 +1259,7 @@ final class Phase52ConstraintSystemTests: XCTestCase {
         XCTAssertTrue(
             (sketch.sketchConstraintMessage ?? "").contains("over-constrains")
         )
-        XCTAssertEqual(sessionPayload(sketch, sketchID).fingerprint, sketchBefore.fingerprint)
+        XCTAssertEqual(try sessionPayload(sketch, sketchID).fingerprint, sketchBefore.fingerprint)
     }
 
     private func sessionPayload(_ session: FFEditorSession, _ nodeID: UUID) throws -> FFCurvePayload {
