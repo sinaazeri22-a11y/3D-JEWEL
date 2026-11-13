@@ -768,7 +768,7 @@ final class Phase52ConstraintSystemTests: XCTestCase {
             ]
         )
         XCTAssertFalse(solution.isSatisfied)
-        XCTAssertEqual(solution.conflicts.map(\.label), ["Tangent on segments 1 and 2"])
+        XCTAssertEqual(solution.conflicts.map(\.label), ["Tangent on segments 0 and 1"])
         XCTAssertEqual(solution.applied.count, 3)
     }
 
@@ -1025,7 +1025,7 @@ final class Phase52ConstraintSystemTests: XCTestCase {
             constraints: [.horizontal(segment: 0)]
         )
         XCTAssertFalse(solution.isSatisfied)
-        XCTAssertEqual(solution.conflicts.map(\.label), ["Horizontal on segment 1"])
+        XCTAssertEqual(solution.conflicts.map(\.label), ["Horizontal on segment 0"])
         XCTAssertTrue(solution.applied.isEmpty)
     }
 
@@ -1051,8 +1051,8 @@ final class Phase52ConstraintSystemTests: XCTestCase {
             constraints: [.horizontal(segment: 0), .vertical(segment: 0)]
         )
         XCTAssertFalse(solution.isSatisfied)
-        XCTAssertEqual(solution.conflicts.map(\.label), ["Vertical on segment 1"])
-        XCTAssertEqual(solution.applied.map(\.label), ["Horizontal on segment 1"])
+        XCTAssertEqual(solution.conflicts.map(\.label), ["Vertical on segment 0"])
+        XCTAssertEqual(solution.applied.map(\.label), ["Horizontal on segment 0"])
     }
 
     func testTheChainSolverRefusesTheSystemKinds() throws {
@@ -1070,7 +1070,7 @@ final class Phase52ConstraintSystemTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? FFSketchConstraintError,
-                .chainSolverCannotSolve("Radius 5.0 mm on circle 1")
+                .chainSolverCannotSolve("Radius 5.0 mm on circle 0")
             )
         }
         XCTAssertThrowsError(

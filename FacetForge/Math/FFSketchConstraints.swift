@@ -40,28 +40,31 @@ enum FFSketchConstraint: Equatable, Sendable {
     /// A sentence a readout or a refusal can carry.
     var label: String {
         switch self {
+        // Segment labels are zero-based, which is the form Phase 51 shipped
+        // and its readout still asserts. Phase 52's kinds follow it rather than
+        // renumbering the shipped ones.
         case .horizontal(let segment):
-            return "Horizontal on segment \(segment + 1)"
+            return "Horizontal on segment \(segment)"
         case .vertical(let segment):
-            return "Vertical on segment \(segment + 1)"
+            return "Vertical on segment \(segment)"
         case .equalLength(let first, let second):
-            return "Equal length on segments \(first + 1) and \(second + 1)"
+            return "Equal length on segments \(first) and \(second)"
         case .tangent(let first, let second):
-            return "Tangent on segments \(first + 1) and \(second + 1)"
+            return "Tangent on segments \(first) and \(second)"
         case .coincident(let first, let second):
             return "Coincident \(first.label) and \(second.label)"
         case .perpendicular(let first, let second):
-            return "Perpendicular on segments \(first + 1) and \(second + 1)"
+            return "Perpendicular on segments \(first) and \(second)"
         case .parallel(let first, let second):
-            return "Parallel on segments \(first + 1) and \(second + 1)"
+            return "Parallel on segments \(first) and \(second)"
         case .concentric(let first, let second):
-            return "Concentric circles \(first + 1) and \(second + 1)"
+            return "Concentric circles \(first) and \(second)"
         case .distance(let first, let second, let value):
             return "Distance \(value) mm from \(first.label) to \(second.label)"
         case .radius(let circle, let value):
-            return "Radius \(value) mm on circle \(circle + 1)"
+            return "Radius \(value) mm on circle \(circle)"
         case .angle(let first, let second, let degrees):
-            return "Angle \(degrees)° between segments \(first + 1) and \(second + 1)"
+            return "Angle \(degrees)° between segments \(first) and \(second)"
         }
     }
 }
