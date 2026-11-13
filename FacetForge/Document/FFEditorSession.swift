@@ -133,6 +133,14 @@ final class FFEditorSession: ObservableObject {
     /// The reason a dimension was not added, edited or held. A refused edit
     /// writes no history, so it must say why it left the sketch alone.
     @Published private(set) var dimensionMessage: String?
+    /// Phase 54's live profile sweep. Nil while no preview is open. The value
+    /// carries its own mesh, so a render pass never rebuilds geometry, and every
+    /// field is session state: a preview commits nothing, so it writes no
+    /// history and never dirties the document.
+    @Published private(set) var surfacePreview: FFSurfacePreview?
+    /// The reason the last preview command produced no mesh. A preview that
+    /// refuses explains itself and leaves the document untouched.
+    @Published private(set) var surfacePreviewMessage: String?
     /// Phase 36's production paperwork. It is document state with this same
     /// owner; the panel only edits drafts and never keeps a copy that could
     /// disagree with the file.
@@ -169,6 +177,15 @@ final class FFEditorSession: ObservableObject {
     @Published private(set) var library: [FFDocumentSummary] = []
 
     private(set) var documentSession: FFDocumentSession
+    /// The sampled profile the preview rebuilds from. Sampling is the expensive
+    /// half, so it happens at begin and never inside a drag. Phase 54's commands
+    /// live in the extension at the bottom of this file, which is why these are
+    /// private at type scope rather than file scope.
+    private var surfaceSource: FFSurfaceSource?
+    private var surfaceMode: FFSweepMode = .extrude
+    private var surfaceHeight = FFSweepMode.extrude.defaultParameter
+    private var surfaceAngle = FFSweepMode.revolve.defaultParameter
+    private var surfaceUpdates = 0
     private let store: FFDocumentStore
     /// What the bundle reader did not understand. Kept across edits so a save
     /// rewrites a future minor writer's fields alongside this version's.
@@ -3300,5 +3317,190 @@ extension FFRenderMaterial {
             metallic: material.metallic,
             roughness: material.roughness
         )
+    }
+}
+
+extension FFEditorSession {
+    /// Opens a preview on the single selected curve.
+    ///
+    /// Refusals leave the document and any previous preview untouched: a
+    /// locked curve, a selection that is not one curve, or a profile the sweep
+    /// cannot take each explain themselves through `surfacePreviewMessage`.
+    @discardableResult
+    func beginSurfacePreview() -> Bool {
+        let ids = selection.selectedIDs
+        guard ids.count == 1, let nodeID = ids.first else {
+            surfacePreview = nil
+            surfaceSource = nil
+            surfacePreviewMessage = "Select one curve to preview a surface"
+            return false
+        }
+        guard let node = documentSession.document.node(withID: nodeID) else {
+            surfacePreview = nil
+            surfaceSource = nil
+            surfacePreviewMessage = "Select one curve to preview a surface"
+            return false
+        }
+        guard !isLocked(nodeID: nodeID) else {
+            surfacePreview = nil
+            surfaceSource = nil
+            surfacePreviewMessage = "That curve is on a locked layer"
+            return false
+        }
+        guard let geometry = node.geometry, let payload = geometry.curve else {
+            surfacePreview = nil
+            surfaceSource = nil
+            surfacePreviewMessage = "Select a curve to preview a surface"
+            return false
+        }
+        do {
+            let profile = try FFSurfaceSweepProfile(payload: payload)
+            surfaceSource = FFSurfaceSource(nodeID: nodeID, profile: profile)
+            surfaceUpdates = 0
+            return rebuildSurfacePreview()
+        } catch let error as FFSweepError {
+            surfacePreview = nil
+            surfaceSource = nil
+            surfacePreviewMessage = error.errorDescription
+            return false
+        } catch {
+            surfacePreview = nil
+            surfaceSource = nil
+            surfacePreviewMessage = "The profile could not be sampled"
+            return false
+        }
+    }
+
+    /// Closes the preview. Nothing is undone, because nothing was committed.
+    func endSurfacePreview() {
+        surfacePreview = nil
+        surfaceSource = nil
+        surfaceUpdates = 0
+        surfacePreviewMessage = nil
+    }
+
+    @discardableResult
+    func setSurfacePreviewMode(_ mode: FFSweepMode) -> Bool {
+        guard surfaceSource != nil else { return false }
+        guard surfaceMode != mode else { return false }
+        surfaceMode = mode
+        return rebuildSurfacePreview()
+    }
+
+    /// The drag path. The view converts a screen delta into millimetres using
+    /// the live camera scale, so the preview edge tracks the finger instead of
+    /// guessing a step per point.
+    @discardableResult
+    func dragSurfacePreview(byMillimetres delta: Double) -> Bool {
+        guard surfaceSource != nil, delta.isFinite else { return false }
+        surfaceHeight = FFMath.clamp(surfaceHeight + delta, to: 0.1...400)
+        guard surfaceMode == .extrude else { return false }
+        return rebuildSurfacePreview()
+    }
+
+    @discardableResult
+    func setSurfacePreviewHeight(_ millimetres: Double) -> Bool {
+        guard surfaceSource != nil, millimetres.isFinite else { return false }
+        let clamped = FFMath.clamp(millimetres, to: 0.1...400)
+        guard abs(clamped - surfaceHeight) > 1e-9 else { return false }
+        surfaceHeight = clamped
+        return rebuildSurfacePreview()
+    }
+
+    @discardableResult
+    func setSurfacePreviewAngle(_ degrees: Double) -> Bool {
+        guard surfaceSource != nil, degrees.isFinite else { return false }
+        let clamped = FFMath.clamp(degrees, to: 5...360)
+        guard abs(clamped - surfaceAngle) > 1e-9 else { return false }
+        surfaceAngle = clamped
+        return rebuildSurfacePreview()
+    }
+
+    /// The drag path for a revolution: one degree per point of horizontal
+    /// travel, clamped to a quarter of a turn to a full turn.
+    @discardableResult
+    func dragSurfacePreviewAngle(byDegrees delta: Double) -> Bool {
+        guard surfaceSource != nil, delta.isFinite else { return false }
+        surfaceAngle = FFMath.clamp(surfaceAngle + delta, to: 5...360)
+        guard surfaceMode == .revolve else { return false }
+        return rebuildSurfacePreview()
+    }
+
+    @discardableResult
+    private func rebuildSurfacePreview() -> Bool {
+        guard let source = surfaceSource,
+              let node = documentSession.document.node(withID: source.nodeID)
+        else {
+            surfacePreview = nil
+            surfaceSource = nil
+            return false
+        }
+        let sweep = FFSurfaceSweep(
+            profile: source.profile,
+            mode: surfaceMode,
+            height: surfaceHeight,
+            angleDegrees: surfaceAngle
+        )
+        let started = DispatchTime.now().uptimeNanoseconds
+        do {
+            let mesh = try sweep.mesh()
+            guard let renderMesh = FFRenderMesh(mesh: mesh) else {
+                throw FFSweepError.degenerateProfile
+            }
+            let elapsed = Double(
+                DispatchTime.now().uptimeNanoseconds - started
+            ) / 1_000_000
+            let transform = node.transform.matrix
+            let plane = surfaceMode == .extrude ? surfaceHeight * 0.5 : 0
+            let centroid = source.profile.centroid
+            let world = transform * Vec4(x: centroid.x, y: centroid.y, z: plane, w: 1)
+            let handle = abs(world.w) > FFMath.eps
+                ? Vec3(x: world.x / world.w, y: world.y / world.w, z: world.z / world.w)
+                : Vec3(x: centroid.x, y: centroid.y, z: plane)
+            surfaceUpdates += 1
+            surfacePreview = FFSurfacePreview(
+                nodeID: source.nodeID,
+                nodeName: node.name,
+                mode: surfaceMode,
+                height: surfaceHeight,
+                angleDegrees: surfaceAngle,
+                profilePointCount: source.profile.points.count,
+                isClosedProfile: source.profile.isClosed,
+                mesh: mesh,
+                renderMesh: renderMesh,
+                transform: transform,
+                handleWorld: handle,
+                updates: surfaceUpdates,
+                buildMilliseconds: elapsed,
+                meshSignature: Self.surfaceSignature(of: mesh)
+            )
+            surfacePreviewMessage = nil
+            return true
+        } catch let error as FFSweepError {
+            surfacePreviewMessage = error.errorDescription
+            return false
+        } catch {
+            surfacePreviewMessage = "The preview could not be built"
+            return false
+        }
+    }
+
+    /// FNV-1a over the vertex positions and the triangle indices. It costs one
+    /// pass over the mesh per update, inside the measured rebuild, and it is
+    /// what lets the renderer reuse a buffer without trusting a vertex count.
+    private static func surfaceSignature(of mesh: IndexedMesh) -> UInt64 {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        let prime: UInt64 = 0x0000_0100_0000_01b3
+        for position in mesh.positions {
+            for bits in [position.x.bitPattern, position.y.bitPattern, position.z.bitPattern] {
+                hash = (hash ^ bits) &* prime
+            }
+        }
+        for triangle in mesh.triangles {
+            for index in triangle.indices {
+                hash = (hash ^ UInt64(index)) &* prime
+            }
+        }
+        return hash
     }
 }

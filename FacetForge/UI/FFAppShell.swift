@@ -215,6 +215,10 @@ struct FFAppShell: View {
     /// Test surface: seeds a version-1 bundle and opens it through the real
     /// reader. The shipping app leaves it false.
     var launchMigrationDemo: Bool = false
+    /// Test surface: opens a saved bundle whose only node is a closed profile,
+    /// so the Surface tool has something real to preview. The shipping app
+    /// leaves it false.
+    var launchSurfaceDemo: Bool = false
     var onOpenGallery: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
@@ -230,10 +234,19 @@ struct FFAppShell: View {
     /// The document and scene owner. The shell keeps layout and input only.
     @StateObject private var session = FFEditorSession()
 
+    /// The document scene plus, while a preview is open, its ghost geometry.
+    /// The preview is attached here rather than stored in the session's scene
+    /// so the document scene stays exactly what the document produced.
+    private var viewportScene: FFViewportScene {
+        guard let preview = session.surfacePreview else { return session.scene }
+        return session.scene.showingPreview([preview.renderNode])
+    }
+
     private let tools: [FFTool] = [
         FFTool(id: "select", systemImage: "cursorarrow", label: "Select"),
         FFTool(id: "sketch", systemImage: "scribble", label: "Sketch"),
         FFTool(id: "line", systemImage: "line.diagonal", label: "Line chain"),
+        FFTool(id: "surface", systemImage: "square.stack.3d.up", label: "Surface"),
         FFTool(id: "gem", systemImage: "diamond", label: "Gem"),
         FFTool(id: "measure", systemImage: "ruler", label: "Measure"),
         FFTool(id: "render", systemImage: "camera", label: "Render"),
@@ -286,7 +299,7 @@ struct FFAppShell: View {
                         lengthUnit: lengthUnit,
                         camera: $camera,
                         namedView: $namedView,
-                        scene: session.scene,
+                        scene: viewportScene,
                         displayModes: session.displayModes,
                         lockedNodeIDs: session.lockedNodeIDs,
                         selection: $session.selection,
@@ -329,6 +342,13 @@ struct FFAppShell: View {
                         },
                         onUndoEdit: { session.undo() },
                         onCycleDisplayMode: { session.cycleDisplayMode(for: $0) },
+                        onBeginSurfacePreview: { _ = session.beginSurfacePreview() },
+                        onEndSurfacePreview: { session.endSurfacePreview() },
+                        onSurfaceMode: { _ = session.setSurfacePreviewMode($0) },
+                        onSurfaceDrag: { _ = session.dragSurfacePreview(byMillimetres: $0) },
+                        onSurfaceAngleDrag: { _ = session.dragSurfacePreviewAngle(byDegrees: $0) },
+                        surfacePreview: session.surfacePreview,
+                        surfaceMessage: session.surfacePreviewMessage,
                         onPerformance: { performance = $0 },
                         onShowTools: { toolsCollapsed = false },
                         onShowInspector: { inspectorCollapsed = false }
@@ -449,6 +469,9 @@ struct FFAppShell: View {
                     session.refreshLibrary()
                 }
                 if launchMigrationDemo, let url = FFLaunchFixtures.prepareMigrationDocument() {
+                    try? session.reopen(from: url)
+                }
+                if launchSurfaceDemo, let url = FFLaunchFixtures.prepareSurfaceDocument() {
                     try? session.reopen(from: url)
                 }
                 session.startAutosave()
@@ -698,6 +721,13 @@ private struct FFViewport: View {
     let onCommitGizmoTransform: (UUID, Mat4, String) -> Void
     let onUndoEdit: () -> Void
     let onCycleDisplayMode: (String) -> Void
+    let onBeginSurfacePreview: () -> Void
+    let onEndSurfacePreview: () -> Void
+    let onSurfaceMode: (FFSweepMode) -> Void
+    let onSurfaceDrag: (Double) -> Void
+    let onSurfaceAngleDrag: (Double) -> Void
+    let surfacePreview: FFSurfacePreview?
+    let surfaceMessage: String?
     let onPerformance: (FFPerformanceReport) -> Void
     let onShowTools: () -> Void
     let onShowInspector: () -> Void
@@ -717,6 +747,8 @@ private struct FFViewport: View {
     private var isDrawingLines: Bool { selectedTool == "line" }
 
     private var isSketching: Bool { selectedTool == "sketch" }
+
+    private var isSurfacing: Bool { selectedTool == "surface" }
 
     private var scaleBarPlan: FFScaleBarPlan? {
         guard let units = camera.worldUnitsPerPoint(
@@ -951,6 +983,22 @@ private struct FFViewport: View {
             if tool != "sketch" {
                 onFreehandCancel()
             }
+            // A preview belongs to the Surface tool and to the document
+            // selection it opened on. Leaving the tool closes it; nothing is
+            // committed, so nothing has to be undone.
+            if tool == "surface" {
+                onBeginSurfacePreview()
+            } else {
+                onEndSurfacePreview()
+            }
+        }
+        .onChange(of: selection.selectedIDs) { _, _ in
+            // The preview follows the selected curve. Re-targeting on a
+            // selection change keeps it from ghosting a profile the jeweller
+            // is no longer looking at.
+            if isSurfacing {
+                onBeginSurfacePreview()
+            }
         }
     }
 
@@ -988,6 +1036,12 @@ private struct FFViewport: View {
                     unit: lengthUnit,
                     metalIdentifier: "shell.viewport.metal",
                     onCycleDisplayMode: { onCycleDisplayMode(pane.id) },
+                    isSurfacing: isSurfacing,
+                    surfacePreview: surfacePreview,
+                    surfaceMessage: surfaceMessage,
+                    onSurfaceMode: onSurfaceMode,
+                    onSurfaceDrag: onSurfaceDrag,
+                    onSurfaceAngleDrag: onSurfaceAngleDrag,
                     onCameraChange: { updated in
                         camera = updated
                         namedView = FFCameraNavigation.namedView(for: updated)
@@ -1064,6 +1118,13 @@ private struct FFViewport: View {
             unit: lengthUnit,
             metalIdentifier: "shell.viewport.metal.\(pane.id)",
             onCycleDisplayMode: { onCycleDisplayMode(pane.id) },
+            // A preview is drawn and dragged only in the maximised pane.
+            isSurfacing: false,
+            surfacePreview: nil,
+            surfaceMessage: nil,
+            onSurfaceMode: { _ in },
+            onSurfaceDrag: { _ in },
+            onSurfaceAngleDrag: { _ in },
             onCameraChange: { updated in
                 fourUpCameras[pane.id] = updated
             },
@@ -1136,6 +1197,12 @@ private struct FFViewportPane: View {
     let unit: FFLengthUnit
     let metalIdentifier: String
     let onCycleDisplayMode: () -> Void
+    let isSurfacing: Bool
+    let surfacePreview: FFSurfacePreview?
+    let surfaceMessage: String?
+    let onSurfaceMode: (FFSweepMode) -> Void
+    let onSurfaceDrag: (Double) -> Void
+    let onSurfaceAngleDrag: (Double) -> Void
     let onCameraChange: (FFCamera) -> Void
     let onPerformance: (FFPerformanceReport) -> Void
 
@@ -1268,6 +1335,17 @@ private struct FFViewportPane: View {
                     )
                 }
 
+                if showsGumball, isSurfacing, let preview = surfacePreview {
+                    FFSurfaceDragHandle(
+                        preview: preview,
+                        camera: camera,
+                        viewport: proxy.size,
+                        unit: unit,
+                        onDragMillimetres: onSurfaceDrag,
+                        onDragDegrees: onSurfaceAngleDrag
+                    )
+                }
+
                 if showsGumball, editableGumballNodeID != nil, !isMeasuring {
                     FFGumballOverlay(
                         session: $gumball,
@@ -1343,6 +1421,16 @@ private struct FFViewportPane: View {
                             measurement.clear()
                             onClearMeasurements()
                         }
+                    )
+                    .padding(.leading, FFSpace.sm)
+                    .padding(.bottom, 72)
+                }
+                if showsGumball, isSurfacing {
+                    FFSurfacePreviewPanel(
+                        preview: surfacePreview,
+                        message: surfaceMessage,
+                        unit: unit,
+                        onMode: onSurfaceMode
                     )
                     .padding(.leading, FFSpace.sm)
                     .padding(.bottom, 72)

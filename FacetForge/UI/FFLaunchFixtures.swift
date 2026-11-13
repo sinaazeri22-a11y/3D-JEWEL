@@ -18,6 +18,59 @@ enum FFLaunchFixtures {
         ProcessInfo.processInfo.arguments.contains("-FFMigrationFixture")
     }
 
+    static var wantsSurfaceDemo: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFSurfaceFixture")
+    }
+
+    /// One closed profile, saved through the real writer and opened by the real
+    /// reader. It is off the local y axis so both an extrusion and a revolution
+    /// are legal on it, and it is large enough that the camera's standard view
+    /// shows the whole ghost.
+    static func prepareSurfaceDocument() -> URL? {
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        let url = documents.appendingPathComponent("Phase54 Profile.ffp")
+        try? FileManager.default.removeItem(at: url)
+
+        let corners = [
+            Vec2(x: 10, y: -15),
+            Vec2(x: 28, y: -15),
+            Vec2(x: 28, y: 15),
+            Vec2(x: 10, y: 15)
+        ]
+        var segments: [FFCurveSegment] = []
+        for index in corners.indices {
+            let start = corners[index]
+            let end = corners[(index + 1) % corners.count]
+            segments.append(FFCurveSegment(
+                kind: .bezier,
+                controlPoints: [FFPoint2(start), FFPoint2(end)]
+            ))
+        }
+        let payload = FFCurvePayload(segments: segments, isClosed: true)
+        var document = FFDocument(name: "Surface preview")
+        let layerID = document.currentLayerID
+        document.rootNodes.append(FFNode(
+            name: "Preview profile",
+            geometry: .curve(payload),
+            kind: .curve,
+            layerID: layerID
+        ))
+        guard (try? FFDocumentStore().save(
+            document,
+            to: url,
+            thumbnail: FFPThumbnail.png(for: document)
+        )) != nil else {
+            return nil
+        }
+        return url
+    }
+
     /// A real bundle written by this build, then rewritten as the bundle a
     /// version-1 app would have produced. The shipping shell opens it through
     /// the normal reader, so the status line the test reads is the line a user

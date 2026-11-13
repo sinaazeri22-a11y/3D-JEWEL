@@ -86,7 +86,7 @@ struct FFSelectionState: Equatable, Sendable {
             // removed from the drawing.
             copy.isVisible = node.isVisible && isVisible(node)
             return copy
-        })
+        }, preview: scene.preview)
     }
 
     /// `extend` is Shift-click, or the Multi chip on touch. A filtered-out pick

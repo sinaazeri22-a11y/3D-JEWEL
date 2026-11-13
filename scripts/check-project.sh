@@ -55,6 +55,9 @@ required = [
     "FacetForge/Document/FFDocument.swift",
     "FacetForge/Document/FFDocumentStore.swift",
     "FacetForge/Document/FFDimensions.swift",
+    "FacetForge/Math/FFSurfaceSweep.swift",
+    "FacetForge/Document/FFSurfacePreview.swift",
+    "FacetForge/UI/FFSurfacePreviewPanel.swift",
     "FacetForge/FileFormat/FFPJSONValue.swift",
     "FacetForge/FileFormat/FFPGeometryCodec.swift",
     "FacetForge/FileFormat/FFPManifest.swift",
@@ -151,6 +154,7 @@ required = [
     "FacetForgeTests/Phase51SketchConstraintTests.swift",
     "FacetForgeTests/Phase52ConstraintSystemTests.swift",
     "FacetForgeTests/Phase53DrivingDimensionTests.swift",
+    "FacetForgeTests/Phase54SurfacePreviewTests.swift",
     "FacetForgeTests/FFPJSONSchemaValidator.swift",
     "FacetForgeUITests/LaunchTests.swift",
     "FacetForgeUITests/GalleryTests.swift",
@@ -170,6 +174,7 @@ required = [
     "FacetForgeUITests/Phase36MetadataUITests.swift",
     "FacetForgeUITests/Phase38MigrationUITests.swift",
     "FacetForgeUITests/Phase42FreehandUITests.swift",
+    "FacetForgeUITests/Phase54SurfacePreviewUITests.swift",
 ]
 for rel in required:
     if not (root / rel).exists():
@@ -330,6 +335,11 @@ if project.exists():
         "A20000000000000000000078 /* Phase51SketchConstraintTests.swift in Sources */",
         "A2000000000000000000007A /* Phase52ConstraintSystemTests.swift in Sources */",
         "A2000000000000000000007C /* Phase53DrivingDimensionTests.swift in Sources */",
+        "A100000000000000000000D1 /* FFSurfaceSweep.swift in Sources */",
+        "A100000000000000000000D3 /* FFSurfacePreview.swift in Sources */",
+        "A100000000000000000000D5 /* FFSurfacePreviewPanel.swift in Sources */",
+        "A2000000000000000000007E /* Phase54SurfacePreviewTests.swift in Sources */",
+        "A3000000000000000000003C /* Phase54SurfacePreviewUITests.swift in Sources */",
         "A20000000000000000000040 /* Phase26ReliabilityTests.swift in Sources */",
         "A20000000000000000000043 /* Phase27JournalTests.swift in Sources */",
         "A20000000000000000000047 /* Phase28LibraryTests.swift in Sources */",

@@ -8,6 +8,7 @@ struct ContentView: View {
             launchRecoveryDemo: FFLaunchFixtures.wantsRecoveryDemo,
             launchBrowserDemo: FFLaunchFixtures.wantsBrowserDemo,
             launchMigrationDemo: FFLaunchFixtures.wantsMigrationDemo,
+            launchSurfaceDemo: FFLaunchFixtures.wantsSurfaceDemo,
             onOpenGallery: { showingGallery = true }
         )
             .background(

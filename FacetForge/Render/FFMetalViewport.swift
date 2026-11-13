@@ -212,11 +212,13 @@ final class FFMetalViewportRenderer {
     private let edgePipelineState: MTLRenderPipelineState
     private let outlinePipelineState: MTLRenderPipelineState
     private let shadowPipelineState: MTLRenderPipelineState
+    private let ghostPipelineState: MTLRenderPipelineState
     private let pickPipelineState: MTLRenderPipelineState
     private let meshDepthState: MTLDepthStencilState
     private let edgeDepthState: MTLDepthStencilState
     private let outlineDepthState: MTLDepthStencilState
     private let shadowDepthState: MTLDepthStencilState
+    private let ghostDepthState: MTLDepthStencilState
     private let vertexBuffer: MTLBuffer
     private struct FFMeshBufferKey: Hashable {
         let nodeID: UUID
@@ -317,6 +319,11 @@ final class FFMetalViewportRenderer {
             vertex: "ff_shadow_vertex",
             fragment: "ff_shadow_fragment",
             blending: true
+        ), let ghostPipelineState = makePipeline(
+            label: "FacetForge viewport preview ghost",
+            vertex: "ff_mesh_vertex",
+            fragment: "ff_ghost_fragment",
+            blending: true
         ) else { return nil }
 
         guard let pickVertexFunction = library.makeFunction(name: "ff_pick_vertex"),
@@ -364,6 +371,10 @@ final class FFMetalViewportRenderer {
             label: "FacetForge viewport shadow depth",
             compare: .always,
             write: false
+        ), let ghostDepthState = makeDepthState(
+            label: "FacetForge viewport preview depth",
+            compare: .lessEqual,
+            write: false
         ) else { return nil }
 
         let vertices = FFViewportGeometry.gridAndAxes()
@@ -388,11 +399,13 @@ final class FFMetalViewportRenderer {
         self.edgePipelineState = edgePipelineState
         self.outlinePipelineState = outlinePipelineState
         self.shadowPipelineState = shadowPipelineState
+        self.ghostPipelineState = ghostPipelineState
         self.pickPipelineState = pickPipelineState
         self.meshDepthState = meshDepthState
         self.edgeDepthState = edgeDepthState
         self.outlineDepthState = outlineDepthState
         self.shadowDepthState = shadowDepthState
+        self.ghostDepthState = ghostDepthState
         self.vertexBuffer = vertexBuffer
         self.lineCount = vertices.count / 2
     }
@@ -914,6 +927,50 @@ final class FFMetalViewportRenderer {
             }
         }
 
+        // Phase 54's preview is a ghost: it is drawn after the opaque meshes so
+        // it blends over the document, and it writes no depth, so it can never
+        // hide the real geometry or be mistaken for a committed solid. It lives
+        // in the scene's separate preview list, which picking never reads.
+        if !scene.preview.isEmpty {
+            encoder.setRenderPipelineState(ghostPipelineState)
+            encoder.setDepthStencilState(ghostDepthState)
+            encoder.setCullMode(.back)
+            for node in scene.preview where node.isVisible {
+                guard let buffers = buffers(
+                    for: node.mesh,
+                    nodeID: node.id,
+                    signature: node.cacheSignature
+                ) else { continue }
+                var uniforms = meshUniforms(
+                    node: node,
+                    camera: camera,
+                    viewProjection: viewProjection,
+                    viewport: viewport,
+                    mode: .shaded
+                )
+                encoder.setVertexBuffer(buffers.vertices, offset: 0, index: 0)
+                encoder.setVertexBuffer(buffers.indices, offset: 0, index: 2)
+                encoder.setVertexBytes(
+                    &uniforms,
+                    length: MemoryLayout<FFMeshUniforms>.stride,
+                    index: 1
+                )
+                encoder.setFragmentBytes(
+                    &uniforms,
+                    length: MemoryLayout<FFMeshUniforms>.stride,
+                    index: 1
+                )
+                encoder.drawIndexedPrimitives(
+                    type: .triangle,
+                    indexCount: buffers.indexCount,
+                    indexType: .uint32,
+                    indexBuffer: buffers.indices,
+                    indexBufferOffset: 0
+                )
+                counters.recordTriangles(buffers.indexCount / 3)
+            }
+        }
+
         // Edges read as a drawing: they sit on top of the shaded faces with a
         // small depth bias. A wireframe has no face pass at all, so the same
         // segments become the whole model and show the far side through it.
@@ -1169,6 +1226,21 @@ final class FFMetalViewportRenderer {
             color = u.baseColor.rgb * (0.74 + 0.22 * facetLight);
         }
         return float4(color, 1.0);
+    }
+
+    // Phase 54's preview ghost. The rim term is what makes a translucent body
+    // read as a surface rather than as fog: the silhouette stays solid while
+    // the faces facing the eye stay light enough to see the document through.
+    fragment float4 ff_ghost_fragment(
+        FFMeshVaryings in [[stage_in]],
+        constant FFMeshUniforms &u [[buffer(1)]]
+    ) {
+        float3 normal = normalize(in.normal);
+        float3 view = normalize(u.cameraPosition.xyz - in.worldPosition);
+        float rim = pow(1.0 - saturate(abs(dot(normal, view))), 1.6);
+        float3 color = u.baseColor.rgb * (0.55 + 0.45 * rim);
+        float alpha = saturate(u.baseColor.a * (0.55 + 0.65 * rim));
+        return float4(color, alpha);
     }
 
     struct FFEdgeVaryings {

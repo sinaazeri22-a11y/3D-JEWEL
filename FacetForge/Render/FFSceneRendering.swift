@@ -114,6 +114,10 @@ struct FFRenderNode: Equatable, Sendable, Identifiable {
     /// Per-material face slices. Empty for a node with no face groups, which
     /// draws exactly as it did before Phase 35.
     var parts: [FFRenderPart]
+    /// Phase 54's content hash for preview geometry. Zero for every document
+    /// node, whose buffers are keyed by id alone; a preview reuses its derived
+    /// id across rebuilds, so it needs the hash to prove the buffer is current.
+    var cacheSignature: UInt64
 
     init(
         id: UUID = UUID(),
@@ -125,7 +129,8 @@ struct FFRenderNode: Equatable, Sendable, Identifiable {
         kind: FFPickKind = .solid,
         isVisible: Bool = true,
         layerColor: FFRGBA = .gold,
-        parts: [FFRenderPart] = []
+        parts: [FFRenderPart] = [],
+        cacheSignature: UInt64 = 0
     ) {
         self.id = id
         self.name = name
@@ -137,6 +142,7 @@ struct FFRenderNode: Equatable, Sendable, Identifiable {
         self.isVisible = isVisible
         self.layerColor = layerColor
         self.parts = parts
+        self.cacheSignature = cacheSignature
     }
 }
 
@@ -144,15 +150,33 @@ struct FFRenderNode: Equatable, Sendable, Identifiable {
 /// can compare two frames without touching the renderer.
 struct FFViewportScene: Equatable, Sendable {
     var nodes: [FFRenderNode]
+    /// Phase 54's ghost geometry: a profile sweep that is being previewed but
+    /// has not been committed. It lives beside the document nodes rather than
+    /// in them so picking, selection, bounds and the triangle count are all
+    /// exactly what they were before a preview opened; the renderer draws this
+    /// list in its own blended pass.
+    var preview: [FFRenderNode]
 
     static let empty = FFViewportScene(nodes: [])
 
-    init(nodes: [FFRenderNode]) {
+    init(nodes: [FFRenderNode], preview: [FFRenderNode] = []) {
         self.nodes = nodes
+        self.preview = preview
     }
 
     var triangleCount: Int {
         nodes.reduce(0) { $0 + $1.mesh.triangleCount }
+    }
+
+    var previewTriangleCount: Int {
+        preview.reduce(0) { $0 + $1.mesh.triangleCount }
+    }
+
+    /// The scene a preview pass draws. Nil when there is nothing to ghost, so a
+    /// document with no preview keeps the scene it always had.
+    func showingPreview(_ nodes: [FFRenderNode]) -> FFViewportScene {
+        guard !nodes.isEmpty else { return self }
+        return FFViewportScene(nodes: self.nodes, preview: nodes)
     }
 
     var selectedNodeIDs: [UUID] {
@@ -198,7 +222,7 @@ struct FFViewportScene: Equatable, Sendable {
             var copy = node
             copy.isSelected = selected.contains(node.id)
             return copy
-        })
+        }, preview: preview)
     }
 }
 
