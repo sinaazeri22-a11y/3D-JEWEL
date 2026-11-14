@@ -30,14 +30,16 @@ enum SnapshotBaseline {
 
     // Recorded by the macos-26-intel gate on 2026-11-06 (run 42257558856).
     // Every value is a digest of the same committed fixture, not a new render.
-    // "field" predates Phase 24's 44 pt text box: no Intel gate has rendered
-    // that change, so an Intel fallback run must re-record it before claiming
-    // a green.
+    // "field" was the one value that predated Phase 24's 44 pt text box: no
+    // Intel gate had rendered that change until the Phase 55 gate (run
+    // 43519068321, head 8c4725d) became the first, and it recorded exactly the
+    // value below. That run is the Intel table's re-record for "field", so the
+    // two tables now describe the same source.
     static let x86_64Hashes: [String: String] = [
         "button": "a0c17c6dfc5c7b68a0d4e64e8dd7e88cadcbac7774bd8404b1c80bf010ffdf78",
         "chip": "1d7a26f25fe6eb9c310c4c9275bea081f785a6b12a06d84e9c90c9d99658cbba",
         "empty-state": "df29c36f26b456aa8d1a3b470e2bbc623ea571cca79cb95982e9edea0437eb81",
-        "field": "5a489be7107a95cb78f96daf20205ab183e4b8cbe185514662f9fa51d5369157",
+        "field": "d7e36262e7c298e7c3a90a37b55ba79b1d5195b7cfba6a2dc0791021d09fe038",
         "list-row": "12f9dbd3b446b64e9c1942fe51b83547740899375ba10a651f69b7e138a806e3",
         "panel": "3cf8b0b8ceb7fae154d20e2d2e5227e4d45f7409b96694f7de2004744305fd90",
         "segmented": "28539e5e44fd6997ace2cf86c0e53d22bc59925db50f16bf5c1f16bbfd8c7f7c",

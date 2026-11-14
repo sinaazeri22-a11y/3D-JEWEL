@@ -116,7 +116,9 @@ final class Phase55CurveLibraryTests: XCTestCase {
     }
 
     func testInsertingAnEntryThatIsNoLongerInTheLibraryChangesNothing() {
-        let session = FFEditorSession()
+        // A default session opens the bench sample, so "is empty" is only a
+        // premise this test can assert if it starts from an empty document.
+        let session = FFEditorSession(document: FFDocument(name: "Empty"))
         session.curveLibraryDirectory = directory
         XCTAssertNil(session.insertLibraryCurve(UUID()))
         XCTAssertTrue(session.rootNodes.isEmpty)
