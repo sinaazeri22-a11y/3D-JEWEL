@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "macOS runner label; blank means the arm64 default. Pass macos-26-intel when the arm64 pool is starved."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -34,23 +40,34 @@ jobs:
   ios:
     name: Build, test and launch (iPad simulator)
     needs: static
-    # Arm64 is the primary image because its simulators are native and fast. It
-    # was replaced with macos-26-intel after repeated runner_id-0 capacity
-    # cancellations, but on 2026-11-07 the Intel image needed 6-8 minutes just to
-    # boot a simulator and then timed out ordinary UI snapshots, so the gate is
-    # back on arm64. If capacity cancels again, fall back to Intel deliberately
-    # and record the run id rather than polling the queue.
+    # Arm64 (macos-26) is the default and stays the default: its simulators are
+    # native and fast, and it is the architecture the app ships to. The Intel
+    # image exists only as a deliberate fallback for when the arm64 pool is
+    # starved. Both outcomes are recorded here so nobody has to rediscover them.
     #
-    # 2026-11-13: thirteen runner_id-0 zero-step cancellations across five runs
-    # (each queued exactly 15 minutes, never given a runner), so the Phase 55
-    # gate takes the fallback deliberately. Measured, not guessed: Intel run
-    # 43455338992 was killed at 45 minutes; run 43500133294's test step ran
-    # 114 minutes and was still going when the 120-minute ceiling cut it, with
-    # its result bundle incomplete. So the ceiling is 180 minutes, sized from
-    # that measurement with margin: a slower green is a green, a capped job is
-    # not. The label returns to arm64 once this gate has a conclusion; all of
-    # these numbers stay recorded here.
-    runs-on: macos-26-intel
+    # Arm64, 2026-11-13: thirteen runner_id-0 zero-step cancellations across five
+    # runs, each queued exactly 15 minutes and never given a runner. Capacity,
+    # not code - the loop was abandoned as a strategy rather than repeated.
+    #
+    # Intel, same day: runners are granted instantly. Run 43455338992 was killed
+    # by the job's own 45-minute ceiling; run 43500133294's test step ran 114
+    # minutes and was still executing when a 120-minute ceiling cut it, result
+    # bundle incomplete. Neither produced a log, so neither was evidence. The
+    # ceiling was raised to 180 minutes from that measurement, and run
+    # 43519068321 (head 8c4725d) reached a real conclusion in 143 minutes: the
+    # branch compiled for the first time and the suite ran to the end with 8
+    # failures - four real ones, fixed at their cause (an Intel snapshot digest
+    # that had never been rendered, a benchmark budget that only described
+    # arm64, an antialiasing floor probed on a different GPU, and a test premise
+    # that contradicted the bench sample), and four dropped-tap / app-launch
+    # timeouts in UI tests the phase never touched. That is the trade recorded
+    # here: Intel is roughly 2.5 hours per attempt and several times slower than
+    # arm64, so it proves compilation and assertion level, not interactive
+    # performance.
+    #
+    # Dispatch a starved arm64 run with `-f runner=macos-26-intel`; leave the
+    # input blank to keep the arm64 default that push and pull_request use.
+    runs-on: ${{ inputs.runner || 'macos-26' }}
     timeout-minutes: 180
     env:
       PROJECT: FacetForge.xcodeproj

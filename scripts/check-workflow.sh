@@ -34,7 +34,12 @@ for token in '^name:' '^on:' '^jobs:' 'pull_request:' 'workflow_dispatch:' 'perm
   grep -Eq "$token" "$WORKFLOW" || err "missing required token: $token"
 done
 
-grep -Eq '^\s+runs-on: macos-[0-9]+' "$WORKFLOW" || err "no macos-N runner"
+# The simulator job selects its image so a starved arm64 pool can be replaced
+# by the Intel fallback at dispatch time without editing this file. The default
+# must stay the arm64 label, because push and pull_request runs pass no input.
+grep -Eq '^\s+runs-on:.*macos-[0-9]+' "$WORKFLOW" || err "no macos-N runner"
+grep -Eq "^\s+runs-on: \\\$\\{\\{ inputs\.runner \\|\\| 'macos-26' \\}\\}" "$WORKFLOW" \
+  || err "runner selector does not default to the arm64 label (macos-26)"
 grep -Eq '^\s+timeout-minutes:' "$WORKFLOW" || err "no job timeout"
 grep -Eq 'xcodebuild (build|test)' "$WORKFLOW" || err "no xcodebuild build/test step"
 grep -Eq 'CODE_SIGNING_ALLOWED=NO' "$WORKFLOW" || err "simulator build is not signing-free"
