@@ -228,6 +228,10 @@ struct FFAppShell: View {
     /// Test surface: opens the source document with twelve saved curves, more
     /// than the card used to render. The shipping app leaves it false.
     var launchCurveLibraryFull: Bool = false
+    /// Test surface: opens a saved document whose only node is the row's
+    /// ten-thousand-point curve, so the overlay is drawn from a payload the
+    /// benchmark measures. The shipping app leaves it false.
+    var launchCurvePerformanceDemo: Bool = false
     var onOpenGallery: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
@@ -499,6 +503,10 @@ struct FFAppShell: View {
                     try? session.reopen(from: url)
                 }
                 if launchCurveLibraryFull, let url = FFLaunchFixtures.prepareCurveLibraryFullDocument() {
+                    try? session.reopen(from: url)
+                }
+                if launchCurvePerformanceDemo,
+                   let url = FFLaunchFixtures.prepareCurvePerformanceDocument() {
                     try? session.reopen(from: url)
                 }
                 session.startAutosave()

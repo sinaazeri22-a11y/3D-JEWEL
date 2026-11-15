@@ -64,6 +64,10 @@ final class FFEditorSession: ObservableObject {
     /// Curve nodes projected into world space for the viewport overlay. The
     /// session owns the projection; the view only draws it.
     @Published private(set) var curveNodes: [FFCurveRender] = []
+    /// Phase 56's per-node tessellation cache. It lives as long as the session,
+    /// so a control-point edit re-samples only the spans that point touches
+    /// instead of every curve in the document.
+    private var curveTessellationCaches: [UUID: FFCurveTessellationCache] = [:]
     /// Phase 40's live arc draft. Like the line chain it is transient tool
     /// state: a finished arc is an ordinary curve node committed through
     /// `perform`, so undo, the journal and autosave need no arc branch.
@@ -1097,7 +1101,7 @@ final class FFEditorSession: ObservableObject {
         layerSets = document.layerSets
         activeLayerSetID = document.activeLayerSetID
         measurements = document.measurements.map(\.measurement)
-        curveNodes = document.curveRenders()
+        curveNodes = document.curveRenders(caches: &curveTessellationCaches)
         metadata = document.resolvedMetadata
         stoneSummary = document.stoneSummary()
         if !isLoading {
@@ -1114,6 +1118,7 @@ final class FFEditorSession: ObservableObject {
         isLoading = true
         let document = FFDocument(name: "Untitled")
         documentSession = FFDocumentSession(document: document)
+        curveTessellationCaches = [:]
         syncDocumentState()
         isLoading = false
         resetJournal(clearOnDisk: true)
@@ -1138,6 +1143,7 @@ final class FFEditorSession: ObservableObject {
         isLoading = true
         let sample = FFDocument.benchSample
         documentSession = FFDocumentSession(document: sample.document)
+        curveTessellationCaches = [:]
         syncDocumentState()
         isLoading = false
         resetJournal(clearOnDisk: true)
@@ -3208,6 +3214,10 @@ final class FFEditorSession: ObservableObject {
         let loaded = try store.loadContent(from: url)
         isLoading = true
         documentSession = FFDocumentSession(document: loaded.document)
+        // The reopened file's nodes share no identity with the ones on screen,
+        // so the previous document's samples are dropped before the fresh
+        // projection rather than lingering until the next prune.
+        curveTessellationCaches = [:]
         syncDocumentState()
         isLoading = false
         documentURL = url

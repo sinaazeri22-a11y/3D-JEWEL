@@ -202,6 +202,65 @@ enum FFLaunchFixtures {
         return url
     }
 
+    // MARK: - Curve performance
+
+    static var wantsCurvePerformanceDemo: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFCurvePerformanceFixture")
+    }
+
+    /// One saved document whose only node is the row's ten-thousand-point
+    /// curve, written by the real store and opened through the real reader. The
+    /// geometry is the committed harness's own payload, centred on the sketch
+    /// origin so the standard camera frames the whole curve, so the document the
+    /// UI test draws is the same payload the thresholds are measured against.
+    static func prepareCurvePerformanceDocument() -> URL? {
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        let url = documents.appendingPathComponent("Phase56 Benchmark.ffp")
+        try? FileManager.default.removeItem(at: url)
+        // This fixture writes its own document and clears that document's
+        // journal, so an earlier launch's undone edit cannot leave a recovery
+        // prompt covering the shell the test has to reach.
+        FFEditJournal(directory: FFEditJournal.defaultDirectory(for: url)).clear()
+
+        let payload = FFCurveBenchmark.polylinePayload()
+        let document = FFCurveBenchmark.document(
+            name: "Curve performance",
+            nodeName: "Benchmark curve",
+            payload: centred(payload)
+        )
+        guard (try? FFDocumentStore().save(
+            document,
+            to: url,
+            thumbnail: FFPThumbnail.png(for: document)
+        )) != nil else {
+            return nil
+        }
+        return url
+    }
+
+    /// The benchmark's payload spans x from 0 to about 45 mm; the sketch exists
+    /// around the origin, so it is shifted once here rather than in the harness,
+    /// whose own coordinates the thresholds are quoted against.
+    private static func centred(_ payload: FFCurvePayload) -> FFCurvePayload {
+        let xs = payload.segments.flatMap { $0.controlPoints.map(\.x) }
+        guard let minimum = xs.min(), let maximum = xs.max() else { return payload }
+        let offset = (minimum + maximum) * 0.5
+        guard abs(offset) > FFMath.eps else { return payload }
+        var shifted = payload
+        for index in shifted.segments.indices {
+            for point in shifted.segments[index].controlPoints.indices {
+                shifted.segments[index].controlPoints[point].x -= offset
+            }
+        }
+        return shifted
+    }
+
     // MARK: - Curve library
 
     static var wantsCurveLibraryDemo: Bool {

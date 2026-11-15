@@ -305,8 +305,21 @@ extension FFCurvePayload {
 extension FFDocument {
     /// Every curve node in the document, in the same pre-order the object tree
     /// uses, with its points in world space.
+    ///
+    /// This builds fresh tessellations. Callers that rebuild on every edit
+    /// (the editor session does) pass a cache dictionary instead, so an edit to
+    /// one span re-samples one span rather than the whole payload.
     func curveRenders() -> [FFCurveRender] {
+        var caches: [UUID: FFCurveTessellationCache] = [:]
+        return curveRenders(caches: &caches)
+    }
+
+    /// The same projection with a per-node tessellation cache that survives
+    /// between calls. Caches for nodes that no longer draw are dropped, so a
+    /// deleted or hidden curve does not keep its geometry alive.
+    func curveRenders(caches: inout [UUID: FFCurveTessellationCache]) -> [FFCurveRender] {
         var result: [FFCurveRender] = []
+        var visited: Set<UUID> = []
 
         func visit(_ node: FFNode, parent: Mat4) {
             let world = parent * node.localMatrix
@@ -314,26 +327,19 @@ extension FFDocument {
             // node or a hidden layer does not draw, and the overlay must not
             // disagree with the object tree about what is on screen.
             let isDrawn = node.isVisible && (layer(forNodeID: node.id)?.isVisible ?? true)
-            if isDrawn,
-               let payload = node.geometry?.curve,
-               let points = payload.renderPoints(),
-               points.count >= 2 {
-                let transformed = points.map { point -> Vec3 in
-                    let value = world * Vec4(x: point.x, y: point.y, z: point.z, w: 1)
-                    guard abs(value.w) > FFMath.eps else { return point }
-                    return Vec3(
-                        x: value.x / value.w,
-                        y: value.y / value.w,
-                        z: value.z / value.w
-                    )
+            if isDrawn, let payload = node.geometry?.curve {
+                let cache = caches[node.id] ?? FFCurveTessellationCache()
+                caches[node.id] = cache
+                if let local = cache.update(payload: payload), local.count >= 2 {
+                    result.append(FFCurveRender(
+                        id: node.id,
+                        name: node.name,
+                        isClosed: payload.isClosed,
+                        layerID: node.layerID,
+                        worldPoints: cache.worldPoints(matrix: world)
+                    ))
+                    visited.insert(node.id)
                 }
-                result.append(FFCurveRender(
-                    id: node.id,
-                    name: node.name,
-                    isClosed: payload.isClosed,
-                    layerID: node.layerID,
-                    worldPoints: transformed
-                ))
             }
             for child in node.children {
                 visit(child, parent: world)
@@ -342,6 +348,9 @@ extension FFDocument {
 
         for root in rootNodes {
             visit(root, parent: .identity)
+        }
+        if caches.count != visited.count {
+            caches = caches.filter { visited.contains($0.key) }
         }
         return result
     }

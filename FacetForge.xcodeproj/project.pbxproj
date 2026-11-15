@@ -95,10 +95,14 @@
 		A100000000000000000000D5 /* FFSurfacePreviewPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D4 /* FFSurfacePreviewPanel.swift */; };
 		A100000000000000000000D7 /* FFCurveLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D6 /* FFCurveLibrary.swift */; };
 		A100000000000000000000D9 /* FFCurveLibraryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D8 /* FFCurveLibraryPanel.swift */; };
+		A100000000000000000000DB /* FFCurveTessellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000DA /* FFCurveTessellation.swift */; };
+		A100000000000000000000DD /* FFCurveSpatialIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000DC /* FFCurveSpatialIndex.swift */; };
+		A100000000000000000000DF /* FFCurveBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000DE /* FFCurveBenchmark.swift */; };
 		A2000000000000000000007A /* Phase52ConstraintSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000079 /* Phase52ConstraintSystemTests.swift */; };
 		A2000000000000000000007C /* Phase53DrivingDimensionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007B /* Phase53DrivingDimensionTests.swift */; };
 		A2000000000000000000007E /* Phase54SurfacePreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007D /* Phase54SurfacePreviewTests.swift */; };
 		A20000000000000000000080 /* Phase55CurveLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007F /* Phase55CurveLibraryTests.swift */; };
+		A20000000000000000000082 /* Phase56CurvePerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000081 /* Phase56CurvePerformanceTests.swift */; };
 		A100000000000000000000AB /* FFPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AC /* FFPrimitives.swift */; };
 		A100000000000000000000AD /* FFDocumentPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AE /* FFDocumentPrimitives.swift */; };
 		A100000000000000000000A1 /* FFPFormatMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A2 /* FFPFormatMigration.swift */; };
@@ -170,6 +174,7 @@
 		A30000000000000000000039 /* Phase42FreehandUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000003A /* Phase42FreehandUITests.swift */; };
 		A3000000000000000000003C /* Phase54SurfacePreviewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000003B /* Phase54SurfacePreviewUITests.swift */; };
 		A3000000000000000000003E /* Phase55CurveLibraryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000003D /* Phase55CurveLibraryUITests.swift */; };
+		A30000000000000000000040 /* Phase56CurvePerformanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000003F /* Phase56CurvePerformanceUITests.swift */; };
 		A3000000000000000000000B /* LaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000002 /* LaunchTests.swift */; };
 		A3000000000000000000000F /* GalleryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3000000000000000000000E /* GalleryTests.swift */; };
 		A30000000000000000000011 /* AdaptiveShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000010 /* AdaptiveShellTests.swift */; };
@@ -288,10 +293,14 @@
 		A100000000000000000000D4 /* FFSurfacePreviewPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFSurfacePreviewPanel.swift; sourceTree = "<group>"; };
 		A100000000000000000000D6 /* FFCurveLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFCurveLibrary.swift; sourceTree = "<group>"; };
 		A100000000000000000000D8 /* FFCurveLibraryPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFCurveLibraryPanel.swift; sourceTree = "<group>"; };
+		A100000000000000000000DA /* FFCurveTessellation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFCurveTessellation.swift; sourceTree = "<group>"; };
+		A100000000000000000000DC /* FFCurveSpatialIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFCurveSpatialIndex.swift; sourceTree = "<group>"; };
+		A100000000000000000000DE /* FFCurveBenchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFCurveBenchmark.swift; sourceTree = "<group>"; };
 		A20000000000000000000079 /* Phase52ConstraintSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase52ConstraintSystemTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000007B /* Phase53DrivingDimensionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase53DrivingDimensionTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000007D /* Phase54SurfacePreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase54SurfacePreviewTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000007F /* Phase55CurveLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase55CurveLibraryTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000081 /* Phase56CurvePerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase56CurvePerformanceTests.swift; sourceTree = "<group>"; };
 		A100000000000000000000AC /* FFPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPrimitives.swift; sourceTree = "<group>"; };
 		A100000000000000000000AE /* FFDocumentPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFDocumentPrimitives.swift; sourceTree = "<group>"; };
 		A100000000000000000000A2 /* FFPFormatMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFPFormatMigration.swift; sourceTree = "<group>"; };
@@ -363,6 +372,7 @@
 		A3000000000000000000003A /* Phase42FreehandUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase42FreehandUITests.swift; sourceTree = "<group>"; };
 		A3000000000000000000003B /* Phase54SurfacePreviewUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase54SurfacePreviewUITests.swift; sourceTree = "<group>"; };
 		A3000000000000000000003D /* Phase55CurveLibraryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase55CurveLibraryUITests.swift; sourceTree = "<group>"; };
+		A3000000000000000000003F /* Phase56CurvePerformanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase56CurvePerformanceUITests.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* FacetForgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FacetForgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000002 /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
 		A3000000000000000000000E /* GalleryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryTests.swift; sourceTree = "<group>"; };
@@ -496,6 +506,7 @@
 				A100000000000000000000CA /* FFSketchConstraints.swift */,
 				A100000000000000000000CC /* FFSketchSystem.swift */,
 				A100000000000000000000D0 /* FFSurfaceSweep.swift */,
+				A100000000000000000000DA /* FFCurveTessellation.swift */,
 			);
 			path = Math;
 			sourceTree = "<group>";
@@ -514,6 +525,8 @@
 				A10000000000000000000055 /* FFSnapping.swift */,
 				A1000000000000000000005B /* FFDisplayMode.swift */,
 				A10000000000000000000066 /* FFPerformance.swift */,
+				A100000000000000000000DC /* FFCurveSpatialIndex.swift */,
+				A100000000000000000000DE /* FFCurveBenchmark.swift */,
 				A10000000000000000000069 /* FFSnapshotHarness.swift */,
 			);
 			path = Render;
@@ -642,6 +655,7 @@
 				A2000000000000000000007B /* Phase53DrivingDimensionTests.swift */,
 				A2000000000000000000007D /* Phase54SurfacePreviewTests.swift */,
 				A2000000000000000000007F /* Phase55CurveLibraryTests.swift */,
+				A20000000000000000000081 /* Phase56CurvePerformanceTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -674,6 +688,7 @@
 				A3000000000000000000003A /* Phase42FreehandUITests.swift */,
 				A3000000000000000000003B /* Phase54SurfacePreviewUITests.swift */,
 				A3000000000000000000003D /* Phase55CurveLibraryUITests.swift */,
+				A3000000000000000000003F /* Phase56CurvePerformanceUITests.swift */,
 			);
 			path = FacetForgeUITests;
 			sourceTree = "<group>";
@@ -897,6 +912,9 @@
 				A100000000000000000000D5 /* FFSurfacePreviewPanel.swift in Sources */,
 				A100000000000000000000D7 /* FFCurveLibrary.swift in Sources */,
 				A100000000000000000000D9 /* FFCurveLibraryPanel.swift in Sources */,
+				A100000000000000000000DB /* FFCurveTessellation.swift in Sources */,
+				A100000000000000000000DD /* FFCurveSpatialIndex.swift in Sources */,
+				A100000000000000000000DF /* FFCurveBenchmark.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -960,6 +978,7 @@
 				A2000000000000000000007C /* Phase53DrivingDimensionTests.swift in Sources */,
 				A2000000000000000000007E /* Phase54SurfacePreviewTests.swift in Sources */,
 				A20000000000000000000080 /* Phase55CurveLibraryTests.swift in Sources */,
+				A20000000000000000000082 /* Phase56CurvePerformanceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -989,6 +1008,7 @@
 				A30000000000000000000039 /* Phase42FreehandUITests.swift in Sources */,
 				A3000000000000000000003C /* Phase54SurfacePreviewUITests.swift in Sources */,
 				A3000000000000000000003E /* Phase55CurveLibraryUITests.swift in Sources */,
+				A30000000000000000000040 /* Phase56CurvePerformanceUITests.swift in Sources */,
 				A30000000000000000000033 /* Phase35MaterialUITests.swift in Sources */,
 				A30000000000000000000035 /* Phase36MetadataUITests.swift in Sources */,
 				A30000000000000000000037 /* Phase38MigrationUITests.swift in Sources */,
