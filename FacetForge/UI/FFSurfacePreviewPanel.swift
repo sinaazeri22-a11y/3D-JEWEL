@@ -20,6 +20,10 @@ struct FFSurfacePreviewPanel: View {
     let onCommit: () -> Void
 
     @State private var draftText = ""
+    /// The card sits on the viewport, which ignores the keyboard's safe area,
+    /// so the field dismisses itself on submit: the chips and the commit below
+    /// it must never end up under the keyboard.
+    @FocusState private var isDraftFocused: Bool
 
     private var extrusion: FFExtrusionParameters? { preview?.extrusion }
 
@@ -182,6 +186,8 @@ struct FFSurfacePreviewPanel: View {
                     .contentShape(Rectangle())
                     .accessibilityLabel("Draft angle in degrees")
                     .accessibilityIdentifier("shell.extrude.draft")
+                    .focused($isDraftFocused)
+                    .onSubmit { isDraftFocused = false }
                     .onChange(of: draftText) { _, text in
                         guard let value = Self.parsed(text) else { return }
                         onDraft(value)
