@@ -236,6 +236,10 @@ struct FFAppShell: View {
     /// extrusion card commits a real solid through the real reader. The shipping
     /// app leaves it false.
     var launchExtrudeDemo: Bool = false
+    /// Test surface: opens a saved bundle whose only node is a closed section
+    /// off the axis, so the revolve card commits a real solid through the real
+    /// reader. The shipping app leaves it false.
+    var launchRevolveDemo: Bool = false
     var onOpenGallery: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
@@ -369,6 +373,10 @@ struct FFAppShell: View {
                         onSurfaceSymmetric: { _ = session.setExtrusionSymmetric($0) },
                         onSurfaceCaps: { _ = session.setExtrusionCaps($0) },
                         onSurfaceCommit: { _ = session.commitExtrusion() },
+                        onRevolveAngle: { _ = session.setSurfacePreviewAngle($0) },
+                        onRevolveDirection: { _ = session.setRevolveDirection($0) },
+                        onRevolveCaps: { _ = session.setRevolveCaps($0) },
+                        onRevolveCommit: { _ = session.commitRevolve() },
                         surfacePreview: session.surfacePreview,
                         surfaceMessage: session.surfacePreviewMessage,
                         curveLibrary: session.curveLibraryEntries,
@@ -519,6 +527,9 @@ struct FFAppShell: View {
                     try? session.reopen(from: url)
                 }
                 if launchExtrudeDemo, let url = FFLaunchFixtures.prepareExtrudeDocument() {
+                    try? session.reopen(from: url)
+                }
+                if launchRevolveDemo, let url = FFLaunchFixtures.prepareRevolveDocument() {
                     try? session.reopen(from: url)
                 }
                 session.startAutosave()
@@ -778,6 +789,10 @@ private struct FFViewport: View {
     let onSurfaceSymmetric: (Bool) -> Void
     let onSurfaceCaps: (FFExtrudeCaps) -> Void
     let onSurfaceCommit: () -> Void
+    let onRevolveAngle: (Double) -> Void
+    let onRevolveDirection: (FFRevolveDirection) -> Void
+    let onRevolveCaps: (FFRevolveCaps) -> Void
+    let onRevolveCommit: () -> Void
     let surfacePreview: FFSurfacePreview?
     let surfaceMessage: String?
     let curveLibrary: [FFCurveLibraryEntry]
@@ -1109,6 +1124,10 @@ private struct FFViewport: View {
                     onSurfaceSymmetric: onSurfaceSymmetric,
                     onSurfaceCaps: onSurfaceCaps,
                     onSurfaceCommit: onSurfaceCommit,
+                    onRevolveAngle: onRevolveAngle,
+                    onRevolveDirection: onRevolveDirection,
+                    onRevolveCaps: onRevolveCaps,
+                    onRevolveCommit: onRevolveCommit,
                     onCameraChange: { updated in
                         camera = updated
                         namedView = FFCameraNavigation.namedView(for: updated)
@@ -1202,6 +1221,10 @@ private struct FFViewport: View {
             onSurfaceSymmetric: { _ in },
             onSurfaceCaps: { _ in },
             onSurfaceCommit: {},
+            onRevolveAngle: { _ in },
+            onRevolveDirection: { _ in },
+            onRevolveCaps: { _ in },
+            onRevolveCommit: {},
             onCameraChange: { updated in
                 fourUpCameras[pane.id] = updated
             },
@@ -1290,6 +1313,10 @@ private struct FFViewportPane: View {
     let onSurfaceSymmetric: (Bool) -> Void
     let onSurfaceCaps: (FFExtrudeCaps) -> Void
     let onSurfaceCommit: () -> Void
+    let onRevolveAngle: (Double) -> Void
+    let onRevolveDirection: (FFRevolveDirection) -> Void
+    let onRevolveCaps: (FFRevolveCaps) -> Void
+    let onRevolveCommit: () -> Void
     let onCameraChange: (FFCamera) -> Void
     let onPerformance: (FFPerformanceReport) -> Void
 
@@ -1530,7 +1557,11 @@ private struct FFViewportPane: View {
                         onDirection: onSurfaceDirection,
                         onSymmetric: onSurfaceSymmetric,
                         onCaps: onSurfaceCaps,
-                        onCommit: onSurfaceCommit
+                        onCommit: onSurfaceCommit,
+                        onRevolveAngle: onRevolveAngle,
+                        onRevolveDirection: onRevolveDirection,
+                        onRevolveCaps: onRevolveCaps,
+                        onRevolveCommit: onRevolveCommit
                     )
                     .padding(.leading, FFSpace.sm)
                     .padding(.bottom, 72)

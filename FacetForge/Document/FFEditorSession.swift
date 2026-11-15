@@ -208,6 +208,11 @@ final class FFEditorSession: ObservableObject {
     var extrudeDirection: FFExtrudeDirection = .normal
     var extrudeIsSymmetric = false
     var extrudeCaps: FFExtrudeCaps = .capped
+    /// Phase 58's revolution choices: tool state, never document state. They
+    /// live here for the same reason the extrusion choices do, and the setters
+    /// and the commit are in `FFEditorSessionRevolve`.
+    var revolveSweepDirection: FFRevolveDirection = .forward
+    var revolveSweepCaps: FFRevolveCaps = .capped
 
     /// The parameters the live preview and the commit both read. One computed
     /// value, so what the ghost shows and what the document keeps cannot be two
@@ -221,6 +226,16 @@ final class FFEditorSession: ObservableObject {
             caps: extrudeCaps
         )
     }
+    /// Phase 58's revolution parameters, the ones the commit will bake. One
+    /// computed value, so the live ghost and the commit read the same numbers.
+    var revolveParameters: FFRevolveParameters {
+        FFRevolveParameters(
+            angleDegrees: surfaceAngle,
+            direction: revolveSweepDirection,
+            caps: revolveSweepCaps
+        )
+    }
+
     private var surfaceUpdates = 0
     private let store: FFDocumentStore
     /// What the bundle reader did not understand. Kept across edits so a save
@@ -3603,25 +3618,23 @@ extension FFEditorSession {
         }
         let started = DispatchTime.now().uptimeNanoseconds
         do {
-            // Extrude is built by Phase 57's `FFExtrusion`, which owns the
-            // draft, direction, symmetric and cap geometry the commit bakes;
-            // revolve stays with the sweep. The ghost therefore cannot show a
-            // body the commit would build differently.
+            // Each mode is built by its own geometry owner, and the commit
+            // bakes the same parameters the ghost just built with, so the card
+            // cannot show one body and commit another.
             let mesh: IndexedMesh
             let extrusion: FFExtrusionParameters?
+            let revolve: FFRevolveParameters?
             switch surfaceMode {
             case .extrude:
                 let parameters = extrusionParameters
                 mesh = try FFExtrusion(profile: source.profile, parameters: parameters).mesh()
                 extrusion = parameters
+                revolve = nil
             case .revolve:
-                mesh = try FFSurfaceSweep(
-                    profile: source.profile,
-                    mode: .revolve,
-                    height: surfaceHeight,
-                    angleDegrees: surfaceAngle
-                ).mesh()
+                let parameters = revolveParameters
+                mesh = try FFRevolve(profile: source.profile, parameters: parameters).mesh()
                 extrusion = nil
+                revolve = parameters
             }
             guard let renderMesh = FFRenderMesh(mesh: mesh) else {
                 throw FFSweepError.degenerateProfile
@@ -3646,6 +3659,7 @@ extension FFEditorSession {
                 profilePointCount: source.profile.points.count,
                 isClosedProfile: source.profile.isClosed,
                 extrusion: extrusion,
+                revolve: revolve,
                 mesh: mesh,
                 renderMesh: renderMesh,
                 transform: transform,
@@ -3660,6 +3674,9 @@ extension FFEditorSession {
             surfacePreviewMessage = error.errorDescription
             return false
         } catch let error as FFExtrudeError {
+            surfacePreviewMessage = error.errorDescription
+            return false
+        } catch let error as FFRevolveError {
             surfacePreviewMessage = error.errorDescription
             return false
         } catch {

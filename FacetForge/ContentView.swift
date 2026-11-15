@@ -14,6 +14,7 @@ struct ContentView: View {
             launchCurveLibraryFull: FFLaunchFixtures.wantsCurveLibraryFull,
             launchCurvePerformanceDemo: FFLaunchFixtures.wantsCurvePerformanceDemo,
             launchExtrudeDemo: FFLaunchFixtures.wantsExtrudeDemo,
+            launchRevolveDemo: FFLaunchFixtures.wantsRevolveDemo,
             onOpenGallery: { showingGallery = true }
         )
             .background(

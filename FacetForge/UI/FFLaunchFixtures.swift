@@ -26,6 +26,10 @@ enum FFLaunchFixtures {
         ProcessInfo.processInfo.arguments.contains("-FFExtrudeFixture")
     }
 
+    static var wantsRevolveDemo: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFRevolveFixture")
+    }
+
     /// One closed ten-by-ten profile at the origin, saved through the real
     /// writer and opened by the real reader.
     ///
@@ -65,6 +69,61 @@ enum FFLaunchFixtures {
         let layerID = document.currentLayerID
         document.rootNodes.append(FFNode(
             name: "Extrude profile",
+            geometry: .curve(payload),
+            kind: .curve,
+            layerID: layerID
+        ))
+        guard (try? FFDocumentStore().save(
+            document,
+            to: url,
+            thumbnail: FFPThumbnail.png(for: document)
+        )) != nil else {
+            return nil
+        }
+        return url
+    }
+
+    /// One closed section off the axis, saved through the real writer and
+    /// opened by the real reader, so the revolve card reads document geometry.
+    ///
+    /// The section is six millimetres radially and sixteen tall, centred on a
+    /// 27 mm radius: far enough from the axis that the default quarter turn is
+    /// legal without a move, and tall enough that the ghost and the committed
+    /// body are legible in the viewport. The file has its own name and its own
+    /// journal is cleared, so a rerun replaces only its own fixture and never
+    /// another test's recovered edit.
+    static func prepareRevolveDocument() -> URL? {
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        let url = documents.appendingPathComponent("Phase58 Revolve.ffp")
+        try? FileManager.default.removeItem(at: url)
+        clearJournal(for: url)
+
+        let corners = [
+            Vec2(x: 24, y: -8),
+            Vec2(x: 30, y: -8),
+            Vec2(x: 30, y: 8),
+            Vec2(x: 24, y: 8)
+        ]
+        var segments: [FFCurveSegment] = []
+        for index in corners.indices {
+            let start = corners[index]
+            let end = corners[(index + 1) % corners.count]
+            segments.append(FFCurveSegment(
+                kind: .bezier,
+                controlPoints: [FFPoint2(start), FFPoint2(end)]
+            ))
+        }
+        let payload = FFCurvePayload(segments: segments, isClosed: true)
+        var document = FFDocument(name: "Revolve")
+        let layerID = document.currentLayerID
+        document.rootNodes.append(FFNode(
+            name: "Revolve profile",
             geometry: .curve(payload),
             kind: .curve,
             layerID: layerID

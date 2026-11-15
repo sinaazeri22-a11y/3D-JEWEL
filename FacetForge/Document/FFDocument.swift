@@ -429,6 +429,13 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
     /// documents written before this field still decode; encoding omits it
     /// while nil, so an untouched document's canonical hash does not move.
     var extrusion: FFExtrusionDefinition?
+    /// Phase 58's parametric record for a revolved body, and for the ring body
+    /// primitive, which is a full-turn revolution with no source curve. The
+    /// node's geometry is the baked mesh; this is where it came from. Optional
+    /// so schema-1 documents written before this field still decode; encoding
+    /// omits it while nil, so an untouched document's canonical hash does not
+    /// move.
+    var revolve: FFRevolveDefinition?
     var children: [FFNode]
 
     init(
@@ -446,6 +453,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         curvePrimitive: FFCurvePrimitive? = nil,
         dimensions: [FFDimensionAnnotation]? = nil,
         extrusion: FFExtrusionDefinition? = nil,
+        revolve: FFRevolveDefinition? = nil,
         children: [FFNode] = []
     ) {
         self.id = id
@@ -462,6 +470,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         self.curvePrimitive = curvePrimitive
         self.dimensions = dimensions
         self.extrusion = extrusion
+        self.revolve = revolve
         self.children = children
     }
 
