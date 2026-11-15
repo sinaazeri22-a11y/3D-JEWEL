@@ -235,10 +235,11 @@ final class Phase57ExtrudeTests: XCTestCase {
         XCTAssertEqual(info.definition.parameters.direction, .reversed)
 
         // A second body from the same profile, this time uncapped. The card is
-        // reopened because a commit closes the preview it consumed.
+        // reopened because a commit closes the preview it consumed; the height
+        // is tool state and is still five, so it is not re-set here.
         session.selection.select([nodeID])
         XCTAssertTrue(session.beginSurfacePreview())
-        XCTAssertTrue(session.setSurfacePreviewHeight(5))
+        XCTAssertEqual(session.surfacePreview?.height ?? 0, 5, accuracy: 1e-9)
         XCTAssertTrue(session.setExtrusionCaps(.open))
         let open = try XCTUnwrap(session.commitExtrusion())
         let openMesh = try XCTUnwrap(session.document.node(withID: open)?.geometry?.mesh?.mesh)
