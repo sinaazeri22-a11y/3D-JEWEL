@@ -11,7 +11,6 @@ struct ContentView: View {
             launchSurfaceDemo: FFLaunchFixtures.wantsSurfaceDemo,
             launchCurveLibraryDemo: FFLaunchFixtures.wantsCurveLibraryDemo,
             launchCurveLibraryReopen: FFLaunchFixtures.wantsCurveLibraryReopen,
-            launchCurveLibraryTarget: FFLaunchFixtures.wantsCurveLibraryTarget,
             launchCurveLibraryFull: FFLaunchFixtures.wantsCurveLibraryFull,
             onOpenGallery: { showingGallery = true }
         )

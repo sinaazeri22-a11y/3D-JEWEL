@@ -225,9 +225,6 @@ struct FFAppShell: View {
     /// Test surface: reopens that same document with its library untouched, the
     /// relaunch the persistence test needs. The shipping app leaves it false.
     var launchCurveLibraryReopen: Bool = false
-    /// Test surface: opens a second, empty document so a curve in its tree can
-    /// only come from its own library. The shipping app leaves it false.
-    var launchCurveLibraryTarget: Bool = false
     /// Test surface: opens the source document with twelve saved curves, more
     /// than the card used to render. The shipping app leaves it false.
     var launchCurveLibraryFull: Bool = false
@@ -499,9 +496,6 @@ struct FFAppShell: View {
                     try? session.reopen(from: url)
                 }
                 if launchCurveLibraryReopen, let url = FFLaunchFixtures.prepareCurveLibrarySource() {
-                    try? session.reopen(from: url)
-                }
-                if launchCurveLibraryTarget, let url = FFLaunchFixtures.prepareCurveLibraryTarget() {
                     try? session.reopen(from: url)
                 }
                 if launchCurveLibraryFull, let url = FFLaunchFixtures.prepareCurveLibraryFullDocument() {

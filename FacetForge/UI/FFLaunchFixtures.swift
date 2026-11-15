@@ -212,10 +212,6 @@ enum FFLaunchFixtures {
         ProcessInfo.processInfo.arguments.contains("-FFCurveLibraryReopen")
     }
 
-    static var wantsCurveLibraryTarget: Bool {
-        ProcessInfo.processInfo.arguments.contains("-FFCurveLibraryTarget")
-    }
-
     static var wantsCurveLibraryFull: Bool {
         ProcessInfo.processInfo.arguments.contains("-FFCurveLibraryFullFixture")
     }
@@ -223,15 +219,22 @@ enum FFLaunchFixtures {
     /// The document the library fixtures share, so a reopen launches the same
     /// file the previous launch saved into rather than a fresh one.
     private static let curveLibrarySourceName = "Phase55 Source.ffp"
+    /// The full-library fixture writes its own document. Sharing the source URL
+    /// would hand it the previous test's journal, and an open recovery prompt
+    /// covers the shell, so the chip would exist but never be reachable.
+    private static let curveLibraryFullName = "Phase55 Full.ffp"
 
     /// A deterministic start for the library test: the pre-Phase-55 app-level
-    /// file is removed so it cannot seed anything, and a freshly written
-    /// document with one named curve opens through the real reader. The bundle
-    /// is new, so it carries no library of its own and a save during the test
-    /// has to write one into the document.
+    /// file and the journal for the fixture document are removed so neither can
+    /// seed or prompt anything, and a freshly written document with one named
+    /// curve opens through the real reader. The bundle is new, so it carries no
+    /// library of its own and a save during the test has to write one into the
+    /// document.
     static func prepareCurveLibraryDocument() -> URL? {
         guard let documents = curveLibraryDocuments() else { return nil }
+        let url = documents.appendingPathComponent(curveLibrarySourceName)
         try? FileManager.default.removeItem(at: documents.appendingPathComponent(FFCurveLibrary.fileName))
+        clearJournal(for: url)
         return writeCurveLibraryDocument(
             named: curveLibrarySourceName,
             title: "Curve library source",
@@ -250,35 +253,31 @@ enum FFLaunchFixtures {
         return url
     }
 
-    /// A second, empty document that shares the folder but not the library, so
-    /// a curve in its tree can only have come from its own library.
-    static func prepareCurveLibraryTarget() -> URL? {
-        guard let documents = curveLibraryDocuments() else { return nil }
-        try? FileManager.default.removeItem(at: documents.appendingPathComponent(FFCurveLibrary.fileName))
-        return writeCurveLibraryDocument(
-            named: "Phase55 Target.ffp",
-            title: "Curve library target",
-            node: nil,
-            in: documents
-        )
-    }
-
-    /// The source document with twelve saved curves already inside its bundle,
+    /// An empty document with twelve saved curves already inside its bundle,
     /// which is more than the card used to render. The rows are real entries in
     /// the real sidecar, so reaching the twelfth proves the card reaches the
-    /// file rather than a test-only list.
+    /// file rather than a test-only list, and a curve in the tree afterwards
+    /// can only have come from the library.
     static func prepareCurveLibraryFullDocument() -> URL? {
-        guard let documents = curveLibraryDocuments(),
-              let url = writeCurveLibraryDocument(
-                  named: curveLibrarySourceName,
-                  title: "Curve library source",
-                  node: "Library source",
-                  in: documents
-              )
-        else { return nil }
+        guard let documents = curveLibraryDocuments() else { return nil }
+        let full = documents.appendingPathComponent(curveLibraryFullName)
+        clearJournal(for: full)
+        guard let url = writeCurveLibraryDocument(
+            named: curveLibraryFullName,
+            title: "Curve library full",
+            node: nil,
+            in: documents
+        ) else { return nil }
         try? FileManager.default.removeItem(at: documents.appendingPathComponent(FFCurveLibrary.fileName))
         seedCurveLibrary(count: 12, in: url)
         return url
+    }
+
+    /// A relaunch test must not inherit a recovery offer from an earlier run,
+    /// so every fixture that writes a document starts from an empty journal for
+    /// that exact file.
+    private static func clearJournal(for url: URL) {
+        FFEditJournal(directory: FFEditJournal.defaultDirectory(for: url)).clear()
     }
 
     private static func curveLibraryDocuments() -> URL? {
