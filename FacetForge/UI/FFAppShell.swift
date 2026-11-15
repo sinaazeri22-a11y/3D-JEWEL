@@ -222,9 +222,15 @@ struct FFAppShell: View {
     /// Test surface: clears the curve library and opens a document with one
     /// curve to save. The shipping app leaves it false.
     var launchCurveLibraryDemo: Bool = false
-    /// Test surface: opens an empty document and leaves the curve library
-    /// alone, so any curve in the tree can only come from a saved entry.
+    /// Test surface: reopens that same document with its library untouched, the
+    /// relaunch the persistence test needs. The shipping app leaves it false.
     var launchCurveLibraryReopen: Bool = false
+    /// Test surface: opens a second, empty document so a curve in its tree can
+    /// only come from its own library. The shipping app leaves it false.
+    var launchCurveLibraryTarget: Bool = false
+    /// Test surface: opens the source document with twelve saved curves, more
+    /// than the card used to render. The shipping app leaves it false.
+    var launchCurveLibraryFull: Bool = false
     var onOpenGallery: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
@@ -492,7 +498,13 @@ struct FFAppShell: View {
                 if launchCurveLibraryDemo, let url = FFLaunchFixtures.prepareCurveLibraryDocument() {
                     try? session.reopen(from: url)
                 }
-                if launchCurveLibraryReopen, let url = FFLaunchFixtures.prepareCurveLibraryTarget() {
+                if launchCurveLibraryReopen, let url = FFLaunchFixtures.prepareCurveLibrarySource() {
+                    try? session.reopen(from: url)
+                }
+                if launchCurveLibraryTarget, let url = FFLaunchFixtures.prepareCurveLibraryTarget() {
+                    try? session.reopen(from: url)
+                }
+                if launchCurveLibraryFull, let url = FFLaunchFixtures.prepareCurveLibraryFullDocument() {
                     try? session.reopen(from: url)
                 }
                 session.startAutosave()

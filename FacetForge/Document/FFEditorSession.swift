@@ -1119,6 +1119,8 @@ final class FFEditorSession: ObservableObject {
         resetJournal(clearOnDisk: true)
         selection = FFSelectionState()
         documentURL = nil
+        curveLibraryEntries = []
+        curveLibraryMessage = nil
         preservation = nil
         recoveryMessage = nil
         migrationReport = nil
@@ -1141,6 +1143,8 @@ final class FFEditorSession: ObservableObject {
         resetJournal(clearOnDisk: true)
         selection = FFSelectionState(selectedIDs: sample.selectedNodeIDs)
         documentURL = nil
+        curveLibraryEntries = []
+        curveLibraryMessage = nil
         preservation = nil
         recoveryMessage = nil
         migrationReport = nil
@@ -2948,17 +2952,49 @@ final class FFEditorSession: ObservableObject {
 
     // MARK: - Curve library
 
-    /// Where `CurveLibrary.json` lives. The shipping app uses the document
-    /// container beside the documents; a test points it at a scratch directory.
-    var curveLibraryDirectory: URL = FFEditorSession.documentsDirectory
-
-    var curveLibrary: FFCurveLibrary {
-        FFCurveLibrary(directory: curveLibraryDirectory)
+    /// Where `CurveLibrary.json` lives: inside the open document's `.ffp`
+    /// bundle, so saved curves travel with the file they belong to instead of
+    /// being shared by every document on the device. Nil while the document has
+    /// no container yet - a document that has never been saved, or a legacy
+    /// single-file document - and a save then refuses with the sentence below
+    /// rather than writing somewhere another document would see.
+    var curveLibraryDirectory: URL? {
+        if let curveLibraryDirectoryOverride { return curveLibraryDirectoryOverride }
+        guard let documentURL else { return nil }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: documentURL.path, isDirectory: &isDirectory),
+              isDirectory.boolValue
+        else { return nil }
+        return documentURL
     }
+
+    /// Test seam: a scratch directory that stands in for the document bundle.
+    var curveLibraryDirectoryOverride: URL?
+
+    /// Where the library was kept before it moved into the document. It is read
+    /// only while the document has no library of its own, so an existing file is
+    /// migrated on the next save instead of being orphaned; nothing deletes it.
+    var legacyCurveLibraryDirectory: URL = FFEditorSession.documentsDirectory
+
+    var curveLibrary: FFCurveLibrary? {
+        guard let directory = curveLibraryDirectory else { return nil }
+        let seed = curveLibraryDirectoryOverride == nil
+            ? legacyCurveLibraryDirectory
+            : nil
+        return FFCurveLibrary(directory: directory, seedDirectory: seed)
+    }
+
+    static let curveLibraryUnavailableMessage =
+        "Save this document before saving a curve into its library"
 
     /// Re-reads the file, so the card lists what is on disk and a relaunch sees
     /// the same entries through the same call.
     func reloadCurveLibrary() {
+        guard let curveLibrary else {
+            curveLibraryEntries = []
+            curveLibraryMessage = Self.curveLibraryUnavailableMessage
+            return
+        }
         curveLibraryEntries = curveLibrary.entries()
     }
 
@@ -2971,6 +3007,10 @@ final class FFEditorSession: ObservableObject {
               let node = documentSession.document.node(withID: nodeID),
               let payload = node.geometry?.curve else {
             curveLibraryMessage = "Select a curve before saving it"
+            return false
+        }
+        guard let curveLibrary else {
+            curveLibraryMessage = Self.curveLibraryUnavailableMessage
             return false
         }
         do {
@@ -2994,6 +3034,10 @@ final class FFEditorSession: ObservableObject {
     /// saved ones, and one undo takes the node away again.
     @discardableResult
     func insertLibraryCurve(_ entryID: UUID) -> UUID? {
+        guard let curveLibrary else {
+            curveLibraryMessage = Self.curveLibraryUnavailableMessage
+            return nil
+        }
         guard let entry = curveLibrary.entry(withID: entryID) else {
             curveLibraryMessage = FFCurveLibraryError.missingEntry.errorDescription
             return nil
@@ -3083,10 +3127,14 @@ final class FFEditorSession: ObservableObject {
         try store.save(
             documentSession.document,
             to: destination,
-            preservation: preservation,
+            // The token is from open time; the curve library may have grown
+            // since. Live unknown files are copied by the writer, and the
+            // library repairs its own checksum entry, so the token stays out.
+            preservation: FFCurveLibrary.withoutLibrary(preservation),
             thumbnail: FFPThumbnail.png(for: documentSession.document)
         )
         documentURL = destination
+        reloadCurveLibrary()
         isDirty = false
         if isAutosave {
             lastAutosaveAt = now()
@@ -3163,7 +3211,7 @@ final class FFEditorSession: ObservableObject {
         syncDocumentState()
         isLoading = false
         documentURL = url
-        preservation = loaded.preservation
+        preservation = FFCurveLibrary.withoutLibrary(loaded.preservation)
         recoveryMessage = loaded.recovery?.message
         migrationReport = loaded.migration
         cancelLineChain()
@@ -3174,6 +3222,7 @@ final class FFEditorSession: ObservableObject {
         lastAutosaveAt = nil
         autosaveMessage = nil
         attachJournalAfterOpen(at: url)
+        reloadCurveLibrary()
         if recoveryOffer == nil {
             if let migration = loaded.migration {
                 documentStatus = "\(migration.headline) · \(url.lastPathComponent)"

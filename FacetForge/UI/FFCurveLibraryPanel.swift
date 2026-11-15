@@ -23,7 +23,7 @@ struct FFCurveLibraryPanel: View {
     var body: some View {
         FFPanel(
             title: "Curve library",
-            subtitle: "Saved in this app's container",
+            subtitle: "Saved with this document",
             trailing: "\(entries.count)"
         ) {
             HStack(spacing: FFSpace.xxs) {
@@ -67,30 +67,20 @@ struct FFCurveLibraryPanel: View {
                     .accessibilityIdentifier("shell.curves.empty")
                     .accessibilityLabel("No saved curves yet")
             } else {
-                ForEach(Array(entries.prefix(8).enumerated()), id: \.element.id) { index, entry in
-                    HStack(spacing: FFSpace.xs) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(entry.name)
-                                .font(FFType.caption)
-                                .foregroundStyle(FFPalette.textPrimary.color)
-                            Text(summary(for: entry))
-                                .font(FFType.monoSmall)
-                                .foregroundStyle(FFPalette.textTertiary.color)
-                        }
-                        Spacer(minLength: FFSpace.xxs)
-                        FFChip(
-                            title: "Insert",
-                            systemImage: "plus",
-                            accessibilityIdentifier: "shell.curves.insert.\(index)"
-                        ) {
-                            onInsert(entry.id)
+                // A bounded scroll region, not a cap. Every saved curve stays
+                // reachable however many there are, and the card keeps a fixed
+                // height so a full library cannot grow over the viewport, the
+                // toolbar or the Metal view's hit testing.
+                ScrollView {
+                    VStack(spacing: FFSpace.xxs) {
+                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                            row(index: index, entry: entry)
                         }
                     }
-                    .contentShape(Rectangle())
-                    .draggable(entry.id.uuidString)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("shell.curves.entry.\(index)")
                 }
+                .frame(maxHeight: 220)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("shell.curves.list")
             }
 
             Text("Drag a row into the viewport to place it")
@@ -102,6 +92,31 @@ struct FFCurveLibraryPanel: View {
         .frame(width: 320)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("shell.curves.card")
+    }
+
+    private func row(index: Int, entry: FFCurveLibraryEntry) -> some View {
+        HStack(spacing: FFSpace.xs) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.name)
+                    .font(FFType.caption)
+                    .foregroundStyle(FFPalette.textPrimary.color)
+                Text(summary(for: entry))
+                    .font(FFType.monoSmall)
+                    .foregroundStyle(FFPalette.textTertiary.color)
+            }
+            Spacer(minLength: FFSpace.xxs)
+            FFChip(
+                title: "Insert",
+                systemImage: "plus",
+                accessibilityIdentifier: "shell.curves.insert.\(index)"
+            ) {
+                onInsert(entry.id)
+            }
+        }
+        .contentShape(Rectangle())
+        .draggable(entry.id.uuidString)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("shell.curves.entry.\(index)")
     }
 
     private func summary(for entry: FFCurveLibraryEntry) -> String {

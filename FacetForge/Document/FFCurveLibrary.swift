@@ -49,14 +49,24 @@ enum FFCurveLibraryError: Error, Equatable, LocalizedError {
     }
 }
 
-/// The user's saved curves, as one JSON file in the document container.
+/// The user's saved curves, as one JSON file inside the document that owns
+/// them.
 ///
-/// The file sits beside the documents rather than inside one, so it survives an
-/// app restart without joining any document's schema and without a format
-/// version moving: `CurveLibrary.json` is not part of a `.ffp` bundle and no
-/// reader of `.ffp` has to know it exists. A missing or damaged file reads as
-/// an empty library instead of refusing to open the app; a save is atomic, so a
-/// crash mid-write cannot truncate the entries that were already there.
+/// The file lives in the open document's `.ffp` bundle, so a jeweller's saved
+/// curves travel with the file they belong to instead of being shared by every
+/// document on the device. It stays an unknown entry as far as the format is
+/// concerned: no manifest field and no reader of `.ffp` has to know it exists,
+/// `FFPDocumentBundle` already copies unknown entries through a save, and the
+/// library adds itself to the bundle's checksum list when it writes so the
+/// document stays verifiable.
+///
+/// Documents written before Phase 55 kept the library beside the app's
+/// documents. `seedDirectory` is read only while the document has no library of
+/// its own, and the first save copies every seeded entry into the document, so
+/// a jeweller's existing curves appear and are never orphaned; the old file is
+/// left untouched rather than deleted. A missing or damaged file reads as an
+/// empty library instead of refusing to open the document; a save is atomic, so
+/// a crash mid-write cannot truncate the entries that were already there.
 struct FFCurveLibrary {
     static let fileName = "CurveLibrary.json"
     static let maximumNameLength = 80
@@ -64,10 +74,13 @@ struct FFCurveLibrary {
     static let maximumTagLength = 32
 
     let directory: URL
+    /// Where the library lived before it moved into the document. Read-only.
+    let seedDirectory: URL?
     private let fileManager: FileManager
 
-    init(directory: URL, fileManager: FileManager = .default) {
+    init(directory: URL, seedDirectory: URL? = nil, fileManager: FileManager = .default) {
         self.directory = directory
+        self.seedDirectory = seedDirectory
         self.fileManager = fileManager
     }
 
@@ -75,14 +88,37 @@ struct FFCurveLibrary {
         directory.appendingPathComponent(Self.fileName)
     }
 
+    var seedFileURL: URL? {
+        seedDirectory?.appendingPathComponent(Self.fileName)
+    }
+
     /// Newest first, then by name, so the card's order is stable across reads.
+    ///
+    /// A document that has no file yet answers from the seed, which is what
+    /// makes a library written before this phase visible in the document it is
+    /// being moved into.
     func entries() -> [FFCurveLibraryEntry] {
-        guard let data = try? Data(contentsOf: fileURL),
+        if let stored = readEntries(at: fileURL) {
+            return sorted(stored)
+        }
+        if let seedFileURL, let seeded = readEntries(at: seedFileURL) {
+            return sorted(seeded)
+        }
+        return []
+    }
+
+    private func readEntries(at url: URL) -> [FFCurveLibraryEntry]? {
+        guard fileManager.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
               let stored = try? Self.decoder.decode([FFCurveLibraryEntry].self, from: data)
         else {
-            return []
+            return nil
         }
-        return stored.sorted { lhs, rhs in
+        return stored
+    }
+
+    private func sorted(_ stored: [FFCurveLibraryEntry]) -> [FFCurveLibraryEntry] {
+        stored.sorted { lhs, rhs in
             if lhs.savedAt != rhs.savedAt {
                 return lhs.savedAt > rhs.savedAt
             }
@@ -94,9 +130,12 @@ struct FFCurveLibrary {
         entries().first { $0.id == id }
     }
 
-    /// Appends one entry and writes the whole file. Duplicate names are allowed
-    /// because the id is the identity; a jeweller may keep two versions of the
-    /// same scroll and tell them apart by tag.
+    /// Appends one entry and writes the whole file into the document. Because
+    /// the list starts from `entries()`, the first save after an upgrade writes
+    /// the seeded entries too: the migration is one-way, best-effort and never
+    /// deletes the old file. Duplicate names are allowed because the id is the
+    /// identity; a jeweller may keep two versions of the same scroll and tell
+    /// them apart by tag.
     @discardableResult
     func save(
         _ payload: FFCurvePayload,
@@ -120,10 +159,47 @@ struct FFCurveLibrary {
         return entry
     }
 
+    /// A document bundle's `checksums.json` covers every file it holds, so a
+    /// sidecar written after a save has to be added to that list in the same
+    /// breath. Without the repair the next open would reject the document as
+    /// damaged; a failure puts the library and the list back as they were rather
+    /// than leaving either half-written.
     private func write(_ entries: [FFCurveLibraryEntry]) throws {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         let data = try Self.encoder.encode(entries)
-        try data.write(to: fileURL, options: .atomic)
+        let checksumsURL = directory.appendingPathComponent(FFPFormat.checksumsName)
+        let inDocumentBundle = fileManager.fileExists(
+            atPath: directory.appendingPathComponent(FFPFormat.manifestName).path
+        ) && fileManager.fileExists(atPath: checksumsURL.path)
+        let previousLibrary = fileManager.contents(atPath: fileURL.path)
+        let previousChecksums = inDocumentBundle ? fileManager.contents(atPath: checksumsURL.path) : nil
+        do {
+            try data.write(to: fileURL, options: .atomic)
+            if inDocumentBundle {
+                try FFPDocumentBundle(fileManager: fileManager).writeChecksums(in: directory)
+            }
+        } catch {
+            if let previousLibrary {
+                try? previousLibrary.write(to: fileURL, options: .atomic)
+            } else {
+                try? fileManager.removeItem(at: fileURL)
+            }
+            if let previousChecksums {
+                try? previousChecksums.write(to: checksumsURL, options: .atomic)
+            }
+            throw error
+        }
+    }
+
+    /// The bundle's unknown-entry token must not speak for this file. A token
+    /// captured when the document was opened would otherwise write the library
+    /// back to its state at open time on the next save, discarding every curve
+    /// saved since; the bundle writer copies live unknown files on its own, so
+    /// the library still travels through a save without the token's help.
+    static func withoutLibrary(_ preservation: FFPBundlePreservation?) -> FFPBundlePreservation? {
+        guard var preservation, preservation.files[fileName] != nil else { return preservation }
+        preservation.files.removeValue(forKey: fileName)
+        return preservation
     }
 
     // MARK: - Normalisation

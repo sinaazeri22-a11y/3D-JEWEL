@@ -212,29 +212,76 @@ enum FFLaunchFixtures {
         ProcessInfo.processInfo.arguments.contains("-FFCurveLibraryReopen")
     }
 
-    /// A deterministic start for the library test: the saved-curve file is
-    /// removed, then a document with one named curve opens through the real
-    /// reader. A save during the test therefore has to write the file.
+    static var wantsCurveLibraryTarget: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFCurveLibraryTarget")
+    }
+
+    static var wantsCurveLibraryFull: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFCurveLibraryFullFixture")
+    }
+
+    /// The document the library fixtures share, so a reopen launches the same
+    /// file the previous launch saved into rather than a fresh one.
+    private static let curveLibrarySourceName = "Phase55 Source.ffp"
+
+    /// A deterministic start for the library test: the pre-Phase-55 app-level
+    /// file is removed so it cannot seed anything, and a freshly written
+    /// document with one named curve opens through the real reader. The bundle
+    /// is new, so it carries no library of its own and a save during the test
+    /// has to write one into the document.
     static func prepareCurveLibraryDocument() -> URL? {
-        guard let documents = FileManager.default.urls(
-            for: .documentDirectory,
-            in: .userDomainMask
-        ).first else {
-            return nil
-        }
-        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        guard let documents = curveLibraryDocuments() else { return nil }
         try? FileManager.default.removeItem(at: documents.appendingPathComponent(FFCurveLibrary.fileName))
         return writeCurveLibraryDocument(
-            named: "Phase55 Source.ffp",
+            named: curveLibrarySourceName,
             title: "Curve library source",
             node: "Library source",
             in: documents
         )
     }
 
-    /// The same library, an empty document. Nothing here touches the saved
-    /// curves, so a curve in the tree after this launch came from the library.
+    /// The same document again, with its library left exactly as the previous
+    /// launch wrote it: this is the relaunch the persistence test needs, and it
+    /// deliberately touches nothing on disk.
+    static func prepareCurveLibrarySource() -> URL? {
+        guard let documents = curveLibraryDocuments() else { return nil }
+        let url = documents.appendingPathComponent(curveLibrarySourceName)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return url
+    }
+
+    /// A second, empty document that shares the folder but not the library, so
+    /// a curve in its tree can only have come from its own library.
     static func prepareCurveLibraryTarget() -> URL? {
+        guard let documents = curveLibraryDocuments() else { return nil }
+        try? FileManager.default.removeItem(at: documents.appendingPathComponent(FFCurveLibrary.fileName))
+        return writeCurveLibraryDocument(
+            named: "Phase55 Target.ffp",
+            title: "Curve library target",
+            node: nil,
+            in: documents
+        )
+    }
+
+    /// The source document with twelve saved curves already inside its bundle,
+    /// which is more than the card used to render. The rows are real entries in
+    /// the real sidecar, so reaching the twelfth proves the card reaches the
+    /// file rather than a test-only list.
+    static func prepareCurveLibraryFullDocument() -> URL? {
+        guard let documents = curveLibraryDocuments(),
+              let url = writeCurveLibraryDocument(
+                  named: curveLibrarySourceName,
+                  title: "Curve library source",
+                  node: "Library source",
+                  in: documents
+              )
+        else { return nil }
+        try? FileManager.default.removeItem(at: documents.appendingPathComponent(FFCurveLibrary.fileName))
+        seedCurveLibrary(count: 12, in: url)
+        return url
+    }
+
+    private static func curveLibraryDocuments() -> URL? {
         guard let documents = FileManager.default.urls(
             for: .documentDirectory,
             in: .userDomainMask
@@ -242,11 +289,51 @@ enum FFLaunchFixtures {
             return nil
         }
         try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
-        return writeCurveLibraryDocument(
-            named: "Phase55 Target.ffp",
-            title: "Curve library target",
-            node: nil,
-            in: documents
+        return documents
+    }
+
+    /// Writes the same JSON shape `FFCurveLibrary` reads, with timestamps one
+    /// second apart so the card's newest-first order is deterministic: index 0
+    /// is the twelfth curve, index 11 the first.
+    private static func seedCurveLibrary(count: Int, in bundle: URL) {
+        guard count > 0 else { return }
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        var entries: [FFCurveLibraryEntry] = []
+        for index in 1...count {
+            entries.append(FFCurveLibraryEntry(
+                name: String(format: "Curve %02d", index),
+                tags: [],
+                payload: seededCurvePayload(index),
+                savedAt: base.addingTimeInterval(Double(index))
+            ))
+        }
+        guard let data = try? JSONEncoder().encode(entries) else { return }
+        try? data.write(
+            to: bundle.appendingPathComponent(FFCurveLibrary.fileName),
+            options: .atomic
+        )
+    }
+
+    private static func seededCurvePayload(_ index: Int) -> FFCurvePayload {
+        let offset = Double(index) * 0.5
+        return FFCurvePayload(
+            segments: [
+                FFCurveSegment(
+                    kind: .bezier,
+                    controlPoints: [
+                        FFPoint2(Vec2(x: -12 + offset, y: -8)),
+                        FFPoint2(Vec2(x: 0, y: 10))
+                    ]
+                ),
+                FFCurveSegment(
+                    kind: .bezier,
+                    controlPoints: [
+                        FFPoint2(Vec2(x: 0, y: 10)),
+                        FFPoint2(Vec2(x: 12 + offset, y: -8))
+                    ]
+                )
+            ],
+            isClosed: false
         )
     }
 

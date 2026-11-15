@@ -57,9 +57,9 @@ final class Phase55CurveLibraryUITests: XCTestCase {
             "the card does not show the typed name"
         )
 
-        // The library is a file beside the documents, so a real relaunch is the
-        // only honest proof it survived. The second fixture opens an empty
-        // document and deliberately leaves the library alone.
+        // The library is a file inside this document's bundle, so a real
+        // relaunch is the only honest proof it survived. The second fixture
+        // reopens the same bundle and deliberately leaves the library alone.
         app.terminate()
         app.launchArguments = ["-FFCurveLibraryReopen"]
         app.launch()
@@ -103,6 +103,55 @@ final class Phase55CurveLibraryUITests: XCTestCase {
 
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = "phase55-curve-library"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// The card used to render `entries.prefix(8)`. The full fixture's document
+    /// carries twelve entries in its own sidecar; the twelfth is off the bottom
+    /// of the card until the list is scrolled, and inserting it must place the
+    /// real saved curve, not merely reveal a label.
+    @MainActor
+    func testATwelfthSavedCurveIsReachableByScrollingAndInserts() throws {
+        let app = XCUIApplication()
+        if app.state != .notRunning {
+            app.terminate()
+        }
+        app.launchArguments = ["-FFCurveLibraryFullFixture"]
+        app.launch()
+
+        let metal = element("shell.viewport.metal", app)
+        XCTAssertTrue(metal.waitForExistence(timeout: 30), "Metal viewport did not appear")
+
+        let toggle = element("shell.curves.toggle", app)
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the library toggle is missing")
+        XCTAssertTrue(waitFor(timeout: 10, { toggle.isHittable }), "the library toggle is unreachable")
+        toggle.tap()
+
+        let list = element("shell.curves.list", app)
+        XCTAssertTrue(list.waitForExistence(timeout: 10), "the library list did not open")
+        XCTAssertTrue(app.staticTexts["Curve 12"].exists, "the newest saved curve is missing")
+
+        let lastRow = element("shell.curves.entry.11", app)
+        XCTAssertTrue(lastRow.exists, "the twelfth saved curve is not in the list at all")
+
+        let insert = element("shell.curves.insert.11", app)
+        var scrolls = 0
+        while !insert.isHittable && scrolls < 12 {
+            list.swipeUp()
+            scrolls += 1
+        }
+        XCTAssertTrue(insert.isHittable, "the twelfth saved curve cannot be reached by scrolling")
+
+        // The document is empty, so this row can only come from the insert.
+        XCTAssertFalse(element("tree.row.Curve 01", app).exists, "the fixture document was not empty")
+        insert.tap()
+
+        let inserted = element("tree.row.Curve 01", app)
+        XCTAssertTrue(inserted.waitForExistence(timeout: 15), "the twelfth saved curve did not insert")
+
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "phase55-curve-library-twelfth"
         shot.lifetime = .keepAlways
         add(shot)
     }
