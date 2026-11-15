@@ -424,6 +424,11 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
     /// before this field still decode; encoding omits it while nil, so an
     /// untouched document's canonical hash does not move.
     var dimensions: [FFDimensionAnnotation]?
+    /// Phase 57's parametric record for an extruded body. The node's geometry is
+    /// the baked mesh; this is where it came from. Optional so schema-1
+    /// documents written before this field still decode; encoding omits it
+    /// while nil, so an untouched document's canonical hash does not move.
+    var extrusion: FFExtrusionDefinition?
     var children: [FFNode]
 
     init(
@@ -440,6 +445,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         faceGroups: [FFFaceGroup]? = nil,
         curvePrimitive: FFCurvePrimitive? = nil,
         dimensions: [FFDimensionAnnotation]? = nil,
+        extrusion: FFExtrusionDefinition? = nil,
         children: [FFNode] = []
     ) {
         self.id = id
@@ -455,6 +461,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         self.faceGroups = faceGroups
         self.curvePrimitive = curvePrimitive
         self.dimensions = dimensions
+        self.extrusion = extrusion
         self.children = children
     }
 

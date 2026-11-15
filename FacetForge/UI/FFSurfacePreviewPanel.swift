@@ -1,14 +1,27 @@
+import Foundation
 import SwiftUI
 
-/// The live preview's card: the mode, the parameter, what the last rebuild
-/// produced and, when it refused, why. It edits session preview state only;
-/// there is no commit command here because Phase 54's row is a preview, not a
-/// solid.
+/// The live preview's card: the mode, the parameters a commit will bake, what
+/// the last rebuild produced and, when it refused, why.
+///
+/// Every control here edits session preview state, which is free and undoable
+/// nothing. Only `Create solid` is a document edit; it is one undo step owned by
+/// the session. Revolve keeps the Phase 54 shape because Phase 57's row is an
+/// extrusion, and a revolve commits nothing until its own phase.
 struct FFSurfacePreviewPanel: View {
     let preview: FFSurfacePreview?
     let message: String?
     let unit: FFLengthUnit
     let onMode: (FFSweepMode) -> Void
+    let onDraft: (Double) -> Void
+    let onDirection: (FFExtrudeDirection) -> Void
+    let onSymmetric: (Bool) -> Void
+    let onCaps: (FFExtrudeCaps) -> Void
+    let onCommit: () -> Void
+
+    @State private var draftText = ""
+
+    private var extrusion: FFExtrusionParameters? { preview?.extrusion }
 
     private var status: String {
         guard let preview else {
@@ -17,8 +30,18 @@ struct FFSurfacePreviewPanel: View {
         return preview.valueLabel(unit: unit)
     }
 
+    private var subtitle: String {
+        preview?.mode == .revolve ? "Preview only" : "Extrude a solid"
+    }
+
+    /// Nil until a preview exists, so the card never advertises a parameter it
+    /// has no body to change.
+    private var showsExtrusionControls: Bool {
+        preview?.mode != .revolve
+    }
+
     var body: some View {
-        FFPanel(title: "Profile to surface", subtitle: "Preview only", trailing: unit.label) {
+        FFPanel(title: "Profile to surface", subtitle: subtitle, trailing: unit.label) {
             Text(status)
                 .font(FFType.mono)
                 .foregroundStyle(FFPalette.textPrimary.color)
@@ -38,6 +61,70 @@ struct FFSurfacePreviewPanel: View {
                 }
             }
 
+            if showsExtrusionControls {
+                draftField
+
+                if extrusion?.isSymmetric != true {
+                    HStack(spacing: FFSpace.xxs) {
+                        ForEach(FFExtrudeDirection.allCases) { direction in
+                            FFChip(
+                                title: direction.label,
+                                isSelected: extrusion?.direction == direction,
+                                accessibilityIdentifier: "shell.extrude.direction.\(direction.rawValue)"
+                            ) {
+                                onDirection(direction)
+                            }
+                        }
+                        FFChip(
+                            title: "Symmetric",
+                            isSelected: extrusion?.isSymmetric == true,
+                            accessibilityIdentifier: "shell.extrude.symmetric"
+                        ) {
+                            onSymmetric(true)
+                        }
+                    }
+                } else {
+                    HStack(spacing: FFSpace.xxs) {
+                        FFChip(
+                            title: "Symmetric",
+                            isSelected: true,
+                            accessibilityIdentifier: "shell.extrude.symmetric"
+                        ) {
+                            onSymmetric(false)
+                        }
+                        if let extrusion, extrusion.isDrafted {
+                            Text("both ends drafted")
+                                .font(FFType.caption)
+                                .foregroundStyle(FFPalette.textTertiary.color)
+                        }
+                    }
+                }
+
+                if preview?.isClosedProfile == true {
+                    HStack(spacing: FFSpace.xxs) {
+                        ForEach(FFExtrudeCaps.allCases) { caps in
+                            FFChip(
+                                title: caps.label,
+                                isSelected: extrusion?.caps == caps,
+                                accessibilityIdentifier: "shell.extrude.caps.\(caps.rawValue)"
+                            ) {
+                                onCaps(caps)
+                            }
+                        }
+                    }
+                }
+
+                FFButton(
+                    title: "Create solid",
+                    systemImage: "cube",
+                    kind: .primary,
+                    isEnabled: preview != nil
+                ) {
+                    onCommit()
+                }
+                .accessibilityIdentifier("shell.extrude.commit")
+            }
+
             if let message {
                 Text(message)
                     .font(FFType.caption)
@@ -50,7 +137,7 @@ struct FFSurfacePreviewPanel: View {
             Text(
                 preview?.isClosedProfile == true
                     ? "Closed profile · drag the handle"
-                    : "Open profile · drag the handle"
+                    : "Open profile · extrudes as a ribbon"
             )
             .font(FFType.caption)
             .foregroundStyle(FFPalette.textTertiary.color)
@@ -63,6 +150,67 @@ struct FFSurfacePreviewPanel: View {
         .frame(width: 320)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("shell.surface.card")
+        // An undrafted body leaves the field empty and shows its placeholder,
+        // so the first digit a jeweller types is the whole angle rather than a
+        // second decimal on a zero.
+        .onAppear { draftText = Self.text(for: extrusion?.draftDegrees ?? 0) }
+        .onChange(of: extrusion?.draftDegrees) { _, value in
+            // The session clamps a draft, so the field follows the effective
+            // value rather than keeping a number the body is not using.
+            guard Self.parsed(draftText) != value else { return }
+            draftText = Self.text(for: value ?? 0)
+        }
+    }
+
+    /// The draft field. Typing applies immediately, because the whole point of
+    /// the card is that the ghost answers to the number the jeweller sees.
+    private var draftField: some View {
+        VStack(alignment: .leading, spacing: FFSpace.xxs) {
+            Text("Draft")
+                .font(FFType.caption)
+                .foregroundStyle(FFPalette.textSecondary.color)
+
+            HStack(spacing: FFSpace.xs) {
+                TextField("0.0", text: $draftText)
+                    .font(FFType.mono)
+                    .foregroundStyle(FFPalette.textPrimary.color)
+                    .keyboardType(.numbersAndPunctuation)
+                    .textFieldStyle(.plain)
+                    .submitLabel(.done)
+                    .padding(.vertical, 13)
+                    .frame(minHeight: FFHitTarget.minimum)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Draft angle in degrees")
+                    .accessibilityIdentifier("shell.extrude.draft")
+                    .onChange(of: draftText) { _, text in
+                        guard let value = Self.parsed(text) else { return }
+                        onDraft(value)
+                    }
+
+                Text("°")
+                    .font(FFType.monoSmall)
+                    .foregroundStyle(FFPalette.textTertiary.color)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, FFSpace.sm)
+            .frame(minHeight: FFHitTarget.minimum)
+            .background(
+                FFPalette.field.color,
+                in: RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: FFRadius.sm, style: .continuous)
+                    .stroke(FFPalette.separator.color, lineWidth: 1)
+            }
+        }
+    }
+
+    private static func text(for degrees: Double) -> String {
+        abs(degrees) <= 1e-9 ? "" : String(format: "%.1f", degrees)
+    }
+
+    private static func parsed(_ text: String) -> Double? {
+        Double(text.replacingOccurrences(of: ",", with: "."))
     }
 }
 

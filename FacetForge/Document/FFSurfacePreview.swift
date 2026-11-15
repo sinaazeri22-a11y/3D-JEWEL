@@ -26,6 +26,9 @@ struct FFSurfacePreview: Equatable, Sendable {
     let angleDegrees: Double
     let profilePointCount: Int
     let isClosedProfile: Bool
+    /// Phase 57's extrusion parameters, the ones the commit will bake. Nil in
+    /// revolve mode, which has no draft, direction or caps to carry.
+    let extrusion: FFExtrusionParameters?
     /// The sweep in the profile plane's own coordinates.
     let mesh: IndexedMesh
     /// The renderer's form of the same mesh, built once per update.
@@ -89,7 +92,14 @@ struct FFSurfacePreview: Equatable, Sendable {
     func summary(unit: FFLengthUnit) -> String {
         switch mode {
         case .extrude:
-            return "\(mode.label) \(FFPrecision.lengthString(millimetres: height, unit: unit))"
+            var line = "\(mode.label) \(FFPrecision.lengthString(millimetres: height, unit: unit))"
+            if let detail = extrusion?.detail { line += " · \(detail)" }
+            if extrusion?.isSymmetric == true { line += " · symmetric" }
+            if extrusion?.direction == .reversed, extrusion?.isSymmetric != true {
+                line += " · reversed"
+            }
+            if extrusion?.caps == .open { line += " · open" }
+            return line
         case .revolve:
             return "\(mode.label) \(FFPrecision.angleString(degrees: angleDegrees))"
         }

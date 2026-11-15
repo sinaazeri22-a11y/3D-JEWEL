@@ -22,6 +22,63 @@ enum FFLaunchFixtures {
         ProcessInfo.processInfo.arguments.contains("-FFSurfaceFixture")
     }
 
+    static var wantsExtrudeDemo: Bool {
+        ProcessInfo.processInfo.arguments.contains("-FFExtrudeFixture")
+    }
+
+    /// One closed ten-by-ten profile at the origin, saved through the real
+    /// writer and opened by the real reader.
+    ///
+    /// Ten millimetres square is the row's own section, so a five millimetre
+    /// commit is the 500 mm3 body the acceptance names, and the square leaves
+    /// the draft measurable along two perpendicular walls. The file has its own
+    /// name so a rerun replaces only its own fixture and never another test's
+    /// recovered edit.
+    static func prepareExtrudeDocument() -> URL? {
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        let url = documents.appendingPathComponent("Phase57 Extrude.ffp")
+        try? FileManager.default.removeItem(at: url)
+
+        let corners = [
+            Vec2(x: -5, y: 0),
+            Vec2(x: 5, y: 0),
+            Vec2(x: 5, y: 10),
+            Vec2(x: -5, y: 10)
+        ]
+        var segments: [FFCurveSegment] = []
+        for index in corners.indices {
+            let start = corners[index]
+            let end = corners[(index + 1) % corners.count]
+            segments.append(FFCurveSegment(
+                kind: .bezier,
+                controlPoints: [FFPoint2(start), FFPoint2(end)]
+            ))
+        }
+        let payload = FFCurvePayload(segments: segments, isClosed: true)
+        var document = FFDocument(name: "Extrude")
+        let layerID = document.currentLayerID
+        document.rootNodes.append(FFNode(
+            name: "Extrude profile",
+            geometry: .curve(payload),
+            kind: .curve,
+            layerID: layerID
+        ))
+        guard (try? FFDocumentStore().save(
+            document,
+            to: url,
+            thumbnail: FFPThumbnail.png(for: document)
+        )) != nil else {
+            return nil
+        }
+        return url
+    }
+
     /// One closed profile, saved through the real writer and opened by the real
     /// reader. It is off the local y axis so both an extrusion and a revolution
     /// are legal on it, and it is large enough that the camera's standard view

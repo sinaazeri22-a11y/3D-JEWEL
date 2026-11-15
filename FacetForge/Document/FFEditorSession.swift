@@ -195,6 +195,28 @@ final class FFEditorSession: ObservableObject {
     private var surfaceMode: FFSweepMode = .extrude
     private var surfaceHeight = FFSweepMode.extrude.defaultParameter
     private var surfaceAngle = FFSweepMode.revolve.defaultParameter
+    /// Phase 57's extrusion choices: tool state, never document state. They
+    /// survive between profiles and close with the tool. Deliberately not
+    /// private: the setters and the commit live in
+    /// `FFEditorSessionExtrusion`, which is where Phase 58 adds its own mode
+    /// rather than growing this file by another tool's worth of commands.
+    var extrudeDraftDegrees = 0.0
+    var extrudeDirection: FFExtrudeDirection = .normal
+    var extrudeIsSymmetric = false
+    var extrudeCaps: FFExtrudeCaps = .capped
+
+    /// The parameters the live preview and the commit both read. One computed
+    /// value, so what the ghost shows and what the document keeps cannot be two
+    /// different parameter sets.
+    var extrusionParameters: FFExtrusionParameters {
+        FFExtrusionParameters(
+            height: surfaceHeight,
+            draftDegrees: extrudeDraftDegrees,
+            direction: extrudeDirection,
+            isSymmetric: extrudeIsSymmetric,
+            caps: extrudeCaps
+        )
+    }
     private var surfaceUpdates = 0
     private let store: FFDocumentStore
     /// What the bundle reader did not understand. Kept across edits so a save
@@ -1090,8 +1112,9 @@ final class FFEditorSession: ObservableObject {
 
     /// Rebuilds every published value that is derived from the document. The
     /// document session remains the only owner; this is the projection the
-    /// shell renders.
-    private func syncDocumentState() {
+    /// shell renders. Not private because a command that lives in its own file
+    /// (Phase 57's extrusion commit) is still an edit of this session.
+    func syncDocumentState() {
         let document = documentSession.document
         scene = Self.scene(from: document)
         displayModes = document.displayModes
@@ -3566,7 +3589,7 @@ extension FFEditorSession {
     }
 
     @discardableResult
-    private func rebuildSurfacePreview() -> Bool {
+    func rebuildSurfacePreview() -> Bool {
         guard let source = surfaceSource,
               let node = documentSession.document.node(withID: source.nodeID)
         else {
@@ -3574,15 +3597,28 @@ extension FFEditorSession {
             surfaceSource = nil
             return false
         }
-        let sweep = FFSurfaceSweep(
-            profile: source.profile,
-            mode: surfaceMode,
-            height: surfaceHeight,
-            angleDegrees: surfaceAngle
-        )
         let started = DispatchTime.now().uptimeNanoseconds
         do {
-            let mesh = try sweep.mesh()
+            // Extrude is built by Phase 57's `FFExtrusion`, which owns the
+            // draft, direction, symmetric and cap geometry the commit bakes;
+            // revolve stays with the sweep. The ghost therefore cannot show a
+            // body the commit would build differently.
+            let mesh: IndexedMesh
+            let extrusion: FFExtrusionParameters?
+            switch surfaceMode {
+            case .extrude:
+                let parameters = extrusionParameters
+                mesh = try FFExtrusion(profile: source.profile, parameters: parameters).mesh()
+                extrusion = parameters
+            case .revolve:
+                mesh = try FFSurfaceSweep(
+                    profile: source.profile,
+                    mode: .revolve,
+                    height: surfaceHeight,
+                    angleDegrees: surfaceAngle
+                ).mesh()
+                extrusion = nil
+            }
             guard let renderMesh = FFRenderMesh(mesh: mesh) else {
                 throw FFSweepError.degenerateProfile
             }
@@ -3590,7 +3626,7 @@ extension FFEditorSession {
                 DispatchTime.now().uptimeNanoseconds - started
             ) / 1_000_000
             let transform = node.transform.matrix
-            let plane = surfaceMode == .extrude ? surfaceHeight * 0.5 : 0
+            let plane = extrusion.map { ($0.zRange.low + $0.zRange.high) / 2 } ?? 0
             let centroid = source.profile.centroid
             let world = transform * Vec4(x: centroid.x, y: centroid.y, z: plane, w: 1)
             let handle = abs(world.w) > FFMath.eps
@@ -3605,6 +3641,7 @@ extension FFEditorSession {
                 angleDegrees: surfaceAngle,
                 profilePointCount: source.profile.points.count,
                 isClosedProfile: source.profile.isClosed,
+                extrusion: extrusion,
                 mesh: mesh,
                 renderMesh: renderMesh,
                 transform: transform,
@@ -3616,6 +3653,9 @@ extension FFEditorSession {
             surfacePreviewMessage = nil
             return true
         } catch let error as FFSweepError {
+            surfacePreviewMessage = error.errorDescription
+            return false
+        } catch let error as FFExtrudeError {
             surfacePreviewMessage = error.errorDescription
             return false
         } catch {

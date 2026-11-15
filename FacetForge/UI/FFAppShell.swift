@@ -232,6 +232,10 @@ struct FFAppShell: View {
     /// ten-thousand-point curve, so the overlay is drawn from a payload the
     /// benchmark measures. The shipping app leaves it false.
     var launchCurvePerformanceDemo: Bool = false
+    /// Test surface: opens a saved document with one ten-by-ten profile, so the
+    /// extrusion card commits a real solid through the real reader. The shipping
+    /// app leaves it false.
+    var launchExtrudeDemo: Bool = false
     var onOpenGallery: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
@@ -360,6 +364,11 @@ struct FFAppShell: View {
                         onSurfaceMode: { _ = session.setSurfacePreviewMode($0) },
                         onSurfaceDrag: { _ = session.dragSurfacePreview(byMillimetres: $0) },
                         onSurfaceAngleDrag: { _ = session.dragSurfacePreviewAngle(byDegrees: $0) },
+                        onSurfaceDraft: { _ = session.setExtrusionDraft($0) },
+                        onSurfaceDirection: { _ = session.setExtrusionDirection($0) },
+                        onSurfaceSymmetric: { _ = session.setExtrusionSymmetric($0) },
+                        onSurfaceCaps: { _ = session.setExtrusionCaps($0) },
+                        onSurfaceCommit: { _ = session.commitExtrusion() },
                         surfacePreview: session.surfacePreview,
                         surfaceMessage: session.surfacePreviewMessage,
                         curveLibrary: session.curveLibraryEntries,
@@ -507,6 +516,9 @@ struct FFAppShell: View {
                 }
                 if launchCurvePerformanceDemo,
                    let url = FFLaunchFixtures.prepareCurvePerformanceDocument() {
+                    try? session.reopen(from: url)
+                }
+                if launchExtrudeDemo, let url = FFLaunchFixtures.prepareExtrudeDocument() {
                     try? session.reopen(from: url)
                 }
                 session.startAutosave()
@@ -761,6 +773,11 @@ private struct FFViewport: View {
     let onSurfaceMode: (FFSweepMode) -> Void
     let onSurfaceDrag: (Double) -> Void
     let onSurfaceAngleDrag: (Double) -> Void
+    let onSurfaceDraft: (Double) -> Void
+    let onSurfaceDirection: (FFExtrudeDirection) -> Void
+    let onSurfaceSymmetric: (Bool) -> Void
+    let onSurfaceCaps: (FFExtrudeCaps) -> Void
+    let onSurfaceCommit: () -> Void
     let surfacePreview: FFSurfacePreview?
     let surfaceMessage: String?
     let curveLibrary: [FFCurveLibraryEntry]
@@ -1087,6 +1104,11 @@ private struct FFViewport: View {
                     onSurfaceMode: onSurfaceMode,
                     onSurfaceDrag: onSurfaceDrag,
                     onSurfaceAngleDrag: onSurfaceAngleDrag,
+                    onSurfaceDraft: onSurfaceDraft,
+                    onSurfaceDirection: onSurfaceDirection,
+                    onSurfaceSymmetric: onSurfaceSymmetric,
+                    onSurfaceCaps: onSurfaceCaps,
+                    onSurfaceCommit: onSurfaceCommit,
                     onCameraChange: { updated in
                         camera = updated
                         namedView = FFCameraNavigation.namedView(for: updated)
@@ -1175,6 +1197,11 @@ private struct FFViewport: View {
             onSurfaceMode: { _ in },
             onSurfaceDrag: { _ in },
             onSurfaceAngleDrag: { _ in },
+            onSurfaceDraft: { _ in },
+            onSurfaceDirection: { _ in },
+            onSurfaceSymmetric: { _ in },
+            onSurfaceCaps: { _ in },
+            onSurfaceCommit: {},
             onCameraChange: { updated in
                 fourUpCameras[pane.id] = updated
             },
@@ -1258,6 +1285,11 @@ private struct FFViewportPane: View {
     let onSurfaceMode: (FFSweepMode) -> Void
     let onSurfaceDrag: (Double) -> Void
     let onSurfaceAngleDrag: (Double) -> Void
+    let onSurfaceDraft: (Double) -> Void
+    let onSurfaceDirection: (FFExtrudeDirection) -> Void
+    let onSurfaceSymmetric: (Bool) -> Void
+    let onSurfaceCaps: (FFExtrudeCaps) -> Void
+    let onSurfaceCommit: () -> Void
     let onCameraChange: (FFCamera) -> Void
     let onPerformance: (FFPerformanceReport) -> Void
 
@@ -1493,7 +1525,12 @@ private struct FFViewportPane: View {
                         preview: surfacePreview,
                         message: surfaceMessage,
                         unit: unit,
-                        onMode: onSurfaceMode
+                        onMode: onSurfaceMode,
+                        onDraft: onSurfaceDraft,
+                        onDirection: onSurfaceDirection,
+                        onSymmetric: onSurfaceSymmetric,
+                        onCaps: onSurfaceCaps,
+                        onCommit: onSurfaceCommit
                     )
                     .padding(.leading, FFSpace.sm)
                     .padding(.bottom, 72)

@@ -288,49 +288,24 @@ struct FFSurfaceSweep: Equatable, Sendable {
     // MARK: - Extrude
 
     private func extruded() throws -> IndexedMesh {
-        guard height.isFinite, height > FFMath.eps else {
-            throw FFSweepError.nonPositiveParameter("A height")
-        }
-        let points = profile.points
-        let count = points.count
-        var positions: [Vec3] = []
-        positions.reserveCapacity(count * 2)
-        for point in points {
-            positions.append(Vec3(x: point.x, y: point.y, z: 0))
-        }
-        for point in points {
-            positions.append(Vec3(x: point.x, y: point.y, z: height))
-        }
-
-        var triangles: [MeshTriangle] = []
-        triangles.reserveCapacity(estimatedTriangles)
-        let edges = profile.isClosed ? count : count - 1
-        for index in 0..<edges {
-            let next = (index + 1) % count
-            let bottomA = index
-            let bottomB = next
-            let topA = index + count
-            let topB = next + count
-            triangles.append(MeshTriangle(bottomA, bottomB, topB))
-            triangles.append(MeshTriangle(bottomA, topB, topA))
-        }
-
-        if profile.isClosed {
-            let caps = try FFPolygonTriangulator.triangulate(points)
-            for cap in caps {
-                // The top cap keeps the profile's own counter-clockwise order,
-                // so its normal is +Z; the bottom cap is the reverse. Flipping
-                // either one leaves the mesh watertight but makes the signed
-                // volume smaller by twice the cap's share, which is exactly the
-                // mistake the prism volume test exists to catch.
-                triangles.append(MeshTriangle(cap.0 + count, cap.1 + count, cap.2 + count))
-                triangles.append(MeshTriangle(cap.2, cap.1, cap.0))
+        // One owner for extrusion geometry. Phase 54 wrote the extrude triangles
+        // here; Phase 57 moved them into `FFExtrusion`, so the live preview and
+        // the body a commit bakes are built by the same code with the same
+        // winding. The sweep keeps its own error vocabulary, because a caller
+        // of the preview already reads those sentences.
+        do {
+            return try FFExtrusion(
+                profile: profile,
+                parameters: FFExtrusionParameters(height: height)
+            ).mesh()
+        } catch let error as FFExtrudeError {
+            switch error {
+            case .nonPositiveHeight:
+                throw FFSweepError.nonPositiveParameter("A height")
+            default:
+                throw FFSweepError.degenerateProfile
             }
         }
-        guard let mesh = IndexedMesh(positions: positions, triangles: triangles) else {
-            throw FFSweepError.degenerateProfile
-        }
-        return mesh
     }
 
     // MARK: - Revolve

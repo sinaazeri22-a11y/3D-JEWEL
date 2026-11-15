@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A100000000000000000000E2 /* FFExtrusion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* FFExtrusion.swift */; };
+		A100000000000000000000E4 /* FFDocumentExtrusion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E3 /* FFDocumentExtrusion.swift */; };
+		A100000000000000000000E6 /* FFEditorSessionExtrusion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E5 /* FFEditorSessionExtrusion.swift */; };
+		A20000000000000000000092 /* Phase57ExtrudeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000091 /* Phase57ExtrudeTests.swift */; };
+		A30000000000000000000042 /* Phase57ExtrudeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000041 /* Phase57ExtrudeUITests.swift */; };
 		A1000000000000000000000D /* FacetForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000A /* FacetForgeApp.swift */; };
 		A1000000000000000000000E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000B /* ContentView.swift */; };
 		A1000000000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000C /* Assets.xcassets */; };
@@ -204,6 +209,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A100000000000000000000E1 /* FFExtrusion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFExtrusion.swift; sourceTree = "<group>"; };
+		A100000000000000000000E3 /* FFDocumentExtrusion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFDocumentExtrusion.swift; sourceTree = "<group>"; };
+		A100000000000000000000E5 /* FFEditorSessionExtrusion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFEditorSessionExtrusion.swift; sourceTree = "<group>"; };
+		A20000000000000000000091 /* Phase57ExtrudeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase57ExtrudeTests.swift; sourceTree = "<group>"; };
+		A30000000000000000000041 /* Phase57ExtrudeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase57ExtrudeUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000006 /* FacetForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FacetForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000000000000000000000A /* FacetForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FacetForgeApp.swift; sourceTree = "<group>"; };
 		A1000000000000000000000B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -507,6 +517,7 @@
 				A100000000000000000000CC /* FFSketchSystem.swift */,
 				A100000000000000000000D0 /* FFSurfaceSweep.swift */,
 				A100000000000000000000DA /* FFCurveTessellation.swift */,
+				A100000000000000000000E1 /* FFExtrusion.swift */,
 			);
 			path = Math;
 			sourceTree = "<group>";
@@ -577,6 +588,8 @@
 				A100000000000000000000C8 /* FFSketchPlaneTool.swift */,
 				A100000000000000000000CE /* FFDimensions.swift */,
 				A100000000000000000000D2 /* FFSurfacePreview.swift */,
+				A100000000000000000000E3 /* FFDocumentExtrusion.swift */,
+				A100000000000000000000E5 /* FFEditorSessionExtrusion.swift */,
 				A100000000000000000000D6 /* FFCurveLibrary.swift */,
 			);
 			path = Document;
@@ -656,6 +669,7 @@
 				A2000000000000000000007D /* Phase54SurfacePreviewTests.swift */,
 				A2000000000000000000007F /* Phase55CurveLibraryTests.swift */,
 				A20000000000000000000081 /* Phase56CurvePerformanceTests.swift */,
+				A20000000000000000000091 /* Phase57ExtrudeTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -689,6 +703,7 @@
 				A3000000000000000000003B /* Phase54SurfacePreviewUITests.swift */,
 				A3000000000000000000003D /* Phase55CurveLibraryUITests.swift */,
 				A3000000000000000000003F /* Phase56CurvePerformanceUITests.swift */,
+				A30000000000000000000041 /* Phase57ExtrudeUITests.swift */,
 			);
 			path = FacetForgeUITests;
 			sourceTree = "<group>";
@@ -915,6 +930,9 @@
 				A100000000000000000000DB /* FFCurveTessellation.swift in Sources */,
 				A100000000000000000000DD /* FFCurveSpatialIndex.swift in Sources */,
 				A100000000000000000000DF /* FFCurveBenchmark.swift in Sources */,
+				A100000000000000000000E2 /* FFExtrusion.swift in Sources */,
+				A100000000000000000000E4 /* FFDocumentExtrusion.swift in Sources */,
+				A100000000000000000000E6 /* FFEditorSessionExtrusion.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -979,6 +997,7 @@
 				A2000000000000000000007E /* Phase54SurfacePreviewTests.swift in Sources */,
 				A20000000000000000000080 /* Phase55CurveLibraryTests.swift in Sources */,
 				A20000000000000000000082 /* Phase56CurvePerformanceTests.swift in Sources */,
+				A20000000000000000000092 /* Phase57ExtrudeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1009,6 +1028,7 @@
 				A3000000000000000000003C /* Phase54SurfacePreviewUITests.swift in Sources */,
 				A3000000000000000000003E /* Phase55CurveLibraryUITests.swift in Sources */,
 				A30000000000000000000040 /* Phase56CurvePerformanceUITests.swift in Sources */,
+				A30000000000000000000042 /* Phase57ExtrudeUITests.swift in Sources */,
 				A30000000000000000000033 /* Phase35MaterialUITests.swift in Sources */,
 				A30000000000000000000035 /* Phase36MetadataUITests.swift in Sources */,
 				A30000000000000000000037 /* Phase38MigrationUITests.swift in Sources */,
