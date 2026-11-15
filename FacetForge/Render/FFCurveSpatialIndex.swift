@@ -32,10 +32,6 @@ struct FFCurveSpatialIndex {
     let curves: [FFPickCurve]
     let cellSize: Double
     let indexBuildNanoseconds: UInt64
-    /// The projected screen points per curve. Empty when that curve could not
-    /// be projected, which is the same condition under which the linear picker
-    /// skips it.
-    let projected: [[Vec2]]
 
     private let segments: [Segment]
     private let cells: [Cell: [Int]]
@@ -68,37 +64,29 @@ struct FFCurveSpatialIndex {
         }
 
         let began = DispatchTime.now().uptimeNanoseconds
-        var projected: [[Vec2]] = []
-        projected.reserveCapacity(curves.count)
         var segments: [Segment] = []
         var cells: [Cell: [Int]] = [:]
         var unbucketed: [Int] = []
 
         for (curveIndex, curve) in curves.enumerated() {
-            guard curve.points.count >= 2 else {
-                projected.append([])
-                continue
-            }
+            guard curve.points.count >= 2 else { continue }
             var screen: [Vec2] = []
             screen.reserveCapacity(curve.points.count)
             var projectable = true
             for world in curve.points {
                 guard let point = camera.screenPoint(for: world, viewport: viewport),
                       point.x.isFinite,
-                      point.y.isFinite,
-                      abs(point.x) < Self.coordinateLimit,
-                      abs(point.y) < Self.coordinateLimit
+                      point.y.isFinite
                 else {
                     projectable = false
                     break
                 }
                 screen.append(point)
             }
-            guard projectable else {
-                projected.append([])
-                continue
-            }
-            projected.append(screen)
+            // A curve the camera cannot project is skipped whole, which is what
+            // the linear picker does with it too: `screenDistance` returns nil
+            // for that curve and `pick` moves on.
+            guard projectable else { continue }
 
             let edgeCount = curve.isClosed ? screen.count : screen.count - 1
             guard edgeCount > 0 else { continue }
@@ -108,18 +96,27 @@ struct FFCurveSpatialIndex {
                 let segmentIndex = segments.count
                 segments.append(Segment(curve: curveIndex, start: start, end: end))
 
-                let minimumX = Int((min(start.x, end.x) / cellSize).rounded(.down))
-                let maximumX = Int((max(start.x, end.x) / cellSize).rounded(.down))
-                let minimumY = Int((min(start.y, end.y) / cellSize).rounded(.down))
-                let maximumY = Int((max(start.y, end.y) / cellSize).rounded(.down))
-                guard maximumX - minimumX <= Self.maximumCellExtent,
-                      maximumY - minimumY <= Self.maximumCellExtent
+                // A span wider than the cell budget, or one whose projected
+                // coordinates are too large to put through integer cell maths,
+                // is tested directly rather than bucketed. It stays in the
+                // index, so parity with the linear picker does not depend on
+                // how far off screen a curve reaches.
+                let minimumX = min(start.x, end.x)
+                let maximumX = max(start.x, end.x)
+                let minimumY = min(start.y, end.y)
+                let maximumY = max(start.y, end.y)
+                guard abs(minimumX) < Self.coordinateLimit,
+                      abs(maximumX) < Self.coordinateLimit,
+                      abs(minimumY) < Self.coordinateLimit,
+                      abs(maximumY) < Self.coordinateLimit,
+                      (maximumX - minimumX) / cellSize <= Double(Self.maximumCellExtent),
+                      (maximumY - minimumY) / cellSize <= Double(Self.maximumCellExtent)
                 else {
                     unbucketed.append(segmentIndex)
                     continue
                 }
-                for x in minimumX...maximumX {
-                    for y in minimumY...maximumY {
+                for x in Int((minimumX / cellSize).rounded(.down))...Int((maximumX / cellSize).rounded(.down)) {
+                    for y in Int((minimumY / cellSize).rounded(.down))...Int((maximumY / cellSize).rounded(.down)) {
                         cells[Cell(x: x, y: y), default: []].append(segmentIndex)
                     }
                 }
@@ -128,7 +125,6 @@ struct FFCurveSpatialIndex {
 
         self.curves = curves
         self.cellSize = cellSize
-        self.projected = projected
         self.segments = segments
         self.cells = cells
         self.unbucketed = unbucketed
@@ -142,12 +138,19 @@ struct FFCurveSpatialIndex {
     func pick(at point: Vec2, tolerance: Double = 6) -> FFPickCurve? {
         guard tolerance >= 0, point.x.isFinite, point.y.isFinite else { return nil }
 
-        let minimumX = Int(((point.x - tolerance) / cellSize).rounded(.down))
-        let maximumX = Int(((point.x + tolerance) / cellSize).rounded(.down))
-        let minimumY = Int(((point.y - tolerance) / cellSize).rounded(.down))
-        let maximumY = Int(((point.y + tolerance) / cellSize).rounded(.down))
-        let spansTooManyCells = maximumX - minimumX > Self.maximumQueryExtent
-            || maximumY - minimumY > Self.maximumQueryExtent
+        let probeMinimumX = point.x - tolerance
+        let probeMaximumX = point.x + tolerance
+        let probeMinimumY = point.y - tolerance
+        let probeMaximumY = point.y + tolerance
+        // A search box that is too wide, or one that sits outside the range
+        // integer cell maths can describe, falls back to testing every segment
+        // rather than risking a missed hit or an unrepresentable index.
+        let spansTooManyCells = abs(probeMinimumX) >= Self.coordinateLimit
+            || abs(probeMaximumX) >= Self.coordinateLimit
+            || abs(probeMinimumY) >= Self.coordinateLimit
+            || abs(probeMaximumY) >= Self.coordinateLimit
+            || (probeMaximumX - probeMinimumX) / cellSize > Double(Self.maximumQueryExtent)
+            || (probeMaximumY - probeMinimumY) / cellSize > Double(Self.maximumQueryExtent)
 
         var bestDistance = Double.infinity
         var bestCurve: Int?
@@ -170,8 +173,12 @@ struct FFCurveSpatialIndex {
                 consider(index)
             }
         } else {
-            for x in minimumX...maximumX {
-                for y in minimumY...maximumY {
+            let firstCellX = Int((probeMinimumX / cellSize).rounded(.down))
+            let lastCellX = Int((probeMaximumX / cellSize).rounded(.down))
+            let firstCellY = Int((probeMinimumY / cellSize).rounded(.down))
+            let lastCellY = Int((probeMaximumY / cellSize).rounded(.down))
+            for x in firstCellX...lastCellX {
+                for y in firstCellY...lastCellY {
                     for index in cells[Cell(x: x, y: y)] ?? [] {
                         consider(index)
                     }

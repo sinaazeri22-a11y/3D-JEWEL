@@ -302,6 +302,46 @@ final class Phase56CurvePerformanceTests: XCTestCase {
         XCTAssertGreaterThan(compared, 3_000)
     }
 
+    /// A curve that reaches far past the viewport is still picked exactly like
+    /// the linear picker. Its spans are too long to bucket and their projection
+    /// is not put through integer cell maths, so the index tests them directly
+    /// rather than dropping the curve.
+    func testIndexKeepsGeometryThatReachesPastTheViewport() throws {
+        let near = FFCamera(
+            target: .zero,
+            yaw: FFMath.radians(-35),
+            pitch: FFMath.radians(28),
+            distance: 2
+        )
+        let viewport = Vec2(x: 1024, y: 768)
+        let curves = [
+            FFPickCurve(
+                name: "Long",
+                points: [Vec3(x: -30, y: 0, z: 0), Vec3(x: 31, y: 0, z: 0)]
+            ),
+            FFPickCurve(
+                name: "Sparse",
+                points: (0...12).map { Vec3(x: Double($0) * 5 - 30, y: 4, z: 0) }
+            )
+        ]
+        let index = try XCTUnwrap(
+            FFCurveSpatialIndex(curves: curves, camera: near, viewport: viewport)
+        )
+        var compared = 0
+        for x in stride(from: 0.0, through: 1024.0, by: 32.0) {
+            for y in stride(from: 0.0, through: 768.0, by: 32.0) {
+                let probe = Vec2(x: x, y: y)
+                XCTAssertEqual(
+                    index.pick(at: probe)?.id,
+                    FFCurvePicker.pick(curves: curves, at: probe, camera: near, viewport: viewport)?.id,
+                    "indexed pick disagreed at (\(x), \(y)) with the camera 2 mm out"
+                )
+                compared += 1
+            }
+        }
+        XCTAssertEqual(compared, 33 * 25)
+    }
+
     /// The row's pick clause on a ten-thousand-point curve, and the evidence
     /// that the index is what makes it true rather than a faster machine.
     func testIndexedPickingOfTenThousandPointsStaysUnderTwoMilliseconds() throws {
