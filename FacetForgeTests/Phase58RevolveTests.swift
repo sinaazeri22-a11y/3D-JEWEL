@@ -1,4 +1,6 @@
+import Foundation
 import XCTest
+@testable import FacetForge
 
 /// Phase 58's acceptance: a revolved torus matches its analytic volume within
 /// 0.5%, and a full turn is watertight.
