@@ -87,7 +87,7 @@ extension FFDocument {
         layerID: UUID? = nil
     ) -> UUID? {
         guard let mesh = try? definition.mesh() else { return nil }
-        let node = FFNode(
+        let created = FFNode(
             name: uniqueNodeName(name),
             transform: transform,
             geometry: .mesh(FFMeshPayload(mesh)),
@@ -97,12 +97,12 @@ extension FFDocument {
         )
         let source = definition.sourceNodeID
         let parent = source.flatMap { parentID(of: $0) }
-        let siblings = parent.flatMap { node(withID: $0)?.children } ?? rootNodes
-        let index = source
-            .flatMap { id in siblings.firstIndex { $0.id == id } }
-            .map { $0 + 1 }
-            ?? siblings.count
-        guard insertNode(node, into: parent, at: index) else { return nil }
-        return node.id
+        let siblings = parent.flatMap { self.node(withID: $0)?.children } ?? rootNodes
+        var index = siblings.count
+        if let source, let position = siblings.firstIndex(where: { $0.id == source }) {
+            index = position + 1
+        }
+        guard insertNode(created, into: parent, at: index) else { return nil }
+        return created.id
     }
 }

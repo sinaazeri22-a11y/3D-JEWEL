@@ -160,7 +160,11 @@ final class FFEditorSession: ObservableObject {
     @Published private(set) var stoneSummary = FFStoneSummary(stones: [])
     /// The last document command, shown in the app bar so a smoke run can read
     /// back that save and reopen actually happened.
-    @Published private(set) var documentStatus: String
+    /// The one line the app bar shows. Not `private(set)` because Phase 57's
+    /// extrusion commands live in their own file and are still this session's
+    /// own edits; that file is where the next mode adds its commands rather
+    /// than growing this one.
+    @Published var documentStatus: String
     /// The reason a reopen used the last good save. `nil` on a normal open.
     @Published private(set) var recoveryMessage: String?
     /// What the reader did to an older file. `nil` when the file was already
