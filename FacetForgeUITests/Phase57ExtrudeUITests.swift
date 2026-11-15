@@ -103,10 +103,14 @@ final class Phase57ExtrudeUITests: XCTestCase {
             waitFor(timeout: 10, { undo.isEnabled }),
             "the commit did not create an undo step"
         )
+        // The commit consumes the preview, not the tool: the card stays open for
+        // the next profile, but its readout no longer reports a body and its
+        // commit is disabled until a new preview exists.
         XCTAssertTrue(
-            waitFor(timeout: 10, { !card.exists }),
-            "the card outlived the commit it consumed"
+            waitFor(timeout: 10, { !readout.label.contains("triangles") }),
+            "the preview outlived the commit that consumed it: \(readout.label)"
         )
+        XCTAssertFalse(commit.isEnabled, "Create solid stayed live with no preview")
 
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = "phase57-extrusion-committed"
