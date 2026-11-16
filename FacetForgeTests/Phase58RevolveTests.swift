@@ -234,6 +234,11 @@ final class Phase58RevolveTests: XCTestCase {
         session.selection.select([nodeID])
         XCTAssertTrue(session.beginSurfacePreview())
         XCTAssertTrue(session.setSurfacePreviewMode(.revolve))
+        // The mode opens at the default quarter turn, and the angle setter
+        // reports whether anything changed rather than whether it succeeded, so
+        // go through a different angle first. Asserting the no-op as a success
+        // was this test's own mistake, not a defect in the card.
+        XCTAssertTrue(session.setSurfacePreviewAngle(180))
         XCTAssertTrue(session.setSurfacePreviewAngle(90))
         XCTAssertTrue(session.setRevolveDirection(.reversed))
         XCTAssertTrue(session.setRevolveCaps(.open))
