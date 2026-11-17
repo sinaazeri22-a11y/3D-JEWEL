@@ -436,6 +436,12 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
     /// omits it while nil, so an untouched document's canonical hash does not
     /// move.
     var revolve: FFRevolveDefinition?
+    /// Phase 59's parametric record for a body swept along a rail. The node's
+    /// geometry is the baked mesh; this is where it came from. Optional so
+    /// schema-1 documents written before this field still decode; encoding
+    /// omits it while nil, so an untouched document's canonical hash does not
+    /// move.
+    var railSweep: FFRailSweepDefinition?
     var children: [FFNode]
 
     init(
@@ -454,6 +460,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         dimensions: [FFDimensionAnnotation]? = nil,
         extrusion: FFExtrusionDefinition? = nil,
         revolve: FFRevolveDefinition? = nil,
+        railSweep: FFRailSweepDefinition? = nil,
         children: [FFNode] = []
     ) {
         self.id = id
@@ -471,6 +478,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         self.dimensions = dimensions
         self.extrusion = extrusion
         self.revolve = revolve
+        self.railSweep = railSweep
         self.children = children
     }
 

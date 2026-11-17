@@ -18,6 +18,10 @@
 		A100000000000000000000EE /* FFEditorSessionRevolve.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000ED /* FFEditorSessionRevolve.swift */; };
 		A20000000000000000000094 /* Phase58RevolveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000093 /* Phase58RevolveTests.swift */; };
 		A30000000000000000000044 /* Phase58RevolveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000043 /* Phase58RevolveUITests.swift */; };
+		A100000000000000000000F1 /* FFRailSweep.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000F0 /* FFRailSweep.swift */; };
+		A100000000000000000000F3 /* FFDocumentRailSweep.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000F2 /* FFDocumentRailSweep.swift */; };
+		A100000000000000000000F5 /* FFEditorSessionRailSweep.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000F4 /* FFEditorSessionRailSweep.swift */; };
+		A20000000000000000000096 /* Phase59RailSweepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000095 /* Phase59RailSweepTests.swift */; };
 		A1000000000000000000000D /* FacetForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000A /* FacetForgeApp.swift */; };
 		A1000000000000000000000E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000B /* ContentView.swift */; };
 		A1000000000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000C /* Assets.xcassets */; };
@@ -226,6 +230,10 @@
 		A100000000000000000000ED /* FFEditorSessionRevolve.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFEditorSessionRevolve.swift; sourceTree = "<group>"; };
 		A20000000000000000000093 /* Phase58RevolveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase58RevolveTests.swift; sourceTree = "<group>"; };
 		A30000000000000000000043 /* Phase58RevolveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase58RevolveUITests.swift; sourceTree = "<group>"; };
+		A100000000000000000000F0 /* FFRailSweep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFRailSweep.swift; sourceTree = "<group>"; };
+		A100000000000000000000F2 /* FFDocumentRailSweep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFDocumentRailSweep.swift; sourceTree = "<group>"; };
+		A100000000000000000000F4 /* FFEditorSessionRailSweep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFEditorSessionRailSweep.swift; sourceTree = "<group>"; };
+		A20000000000000000000095 /* Phase59RailSweepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase59RailSweepTests.swift; sourceTree = "<group>"; };
 		A10000000000000000000006 /* FacetForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FacetForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000000000000000000000A /* FacetForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FacetForgeApp.swift; sourceTree = "<group>"; };
 		A1000000000000000000000B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -532,6 +540,7 @@
 				A100000000000000000000E1 /* FFExtrusion.swift */,
 				A100000000000000000000E7 /* FFRevolve.swift */,
 				A100000000000000000000E9 /* FFRingBody.swift */,
+				A100000000000000000000F0 /* FFRailSweep.swift */,
 			);
 			path = Math;
 			sourceTree = "<group>";
@@ -606,6 +615,8 @@
 				A100000000000000000000E5 /* FFEditorSessionExtrusion.swift */,
 				A100000000000000000000EB /* FFDocumentRevolve.swift */,
 				A100000000000000000000ED /* FFEditorSessionRevolve.swift */,
+				A100000000000000000000F2 /* FFDocumentRailSweep.swift */,
+				A100000000000000000000F4 /* FFEditorSessionRailSweep.swift */,
 				A100000000000000000000D6 /* FFCurveLibrary.swift */,
 			);
 			path = Document;
@@ -687,6 +698,7 @@
 				A20000000000000000000081 /* Phase56CurvePerformanceTests.swift */,
 				A20000000000000000000091 /* Phase57ExtrudeTests.swift */,
 				A20000000000000000000093 /* Phase58RevolveTests.swift */,
+				A20000000000000000000095 /* Phase59RailSweepTests.swift */,
 			);
 			path = FacetForgeTests;
 			sourceTree = "<group>";
@@ -955,6 +967,9 @@
 				A100000000000000000000EA /* FFRingBody.swift in Sources */,
 				A100000000000000000000EC /* FFDocumentRevolve.swift in Sources */,
 				A100000000000000000000EE /* FFEditorSessionRevolve.swift in Sources */,
+				A100000000000000000000F1 /* FFRailSweep.swift in Sources */,
+				A100000000000000000000F3 /* FFDocumentRailSweep.swift in Sources */,
+				A100000000000000000000F5 /* FFEditorSessionRailSweep.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1021,6 +1036,7 @@
 				A20000000000000000000082 /* Phase56CurvePerformanceTests.swift in Sources */,
 				A20000000000000000000092 /* Phase57ExtrudeTests.swift in Sources */,
 				A20000000000000000000094 /* Phase58RevolveTests.swift in Sources */,
+				A20000000000000000000096 /* Phase59RailSweepTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
