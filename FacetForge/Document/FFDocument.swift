@@ -442,6 +442,11 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
     /// omits it while nil, so an untouched document's canonical hash does not
     /// move.
     var railSweep: FFRailSweepDefinition?
+    /// Phase 60's parametric record for a multi-section loft. The node's geometry
+    /// is the baked mesh; this is where it came from. Optional so schema-1
+    /// documents written before this field still decode; encoding omits it while
+    /// nil, so an untouched document's canonical hash does not move.
+    var loft: FFLoftDefinition?
     var children: [FFNode]
 
     init(
@@ -461,6 +466,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         extrusion: FFExtrusionDefinition? = nil,
         revolve: FFRevolveDefinition? = nil,
         railSweep: FFRailSweepDefinition? = nil,
+        loft: FFLoftDefinition? = nil,
         children: [FFNode] = []
     ) {
         self.id = id
@@ -479,6 +485,7 @@ struct FFNode: Codable, Equatable, Identifiable, Sendable {
         self.extrusion = extrusion
         self.revolve = revolve
         self.railSweep = railSweep
+        self.loft = loft
         self.children = children
     }
 
