@@ -20,8 +20,8 @@ owner can run, and what happens after.
 - The credential the repo uses reports scopes `gist, read:org, repo` — no
   `workflow`, which is why GitHub refuses a push that touches
   `.github/workflows/ios.yml`.
-- No device-flow poll is running. Earlier codes (`A029-3446`, `8B1C-758B`)
-  expired; do not issue another one.
+- No device-flow poll is running. `A029-3446` expired and `8B1C-758B` was
+  cancelled before expiry; do not issue another one.
 
 ## Why one command fixes both `gh` and `git push`
 
@@ -49,7 +49,7 @@ enter the code, and approve the request for the `workflow` scope on the
 `sinaazeri22-a11y` account. The command blocks until approval or about fifteen
 minutes pass; it keeps the existing scopes and adds `workflow`.
 
-Nothing is written to `C:`: the config directory is on `D:`. The token itself
+No config file is written to `C:`: the config directory is on `D:`. The token itself
 lives in the OS credential store by default (as it does today). Append
 `--insecure-storage` if you want the token written into
 `D:\dev-cache\gh-config\hosts.yml` instead.
