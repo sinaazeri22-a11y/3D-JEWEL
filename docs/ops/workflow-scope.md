@@ -6,7 +6,7 @@ owner can run, and what happens after.
 
 ## State at the time of writing (2026-11-17)
 
-- `main` and `origin/main` are at `762e214`. Row 59 is closed: its trunk
+- `main` and `origin/main` were at `762e214` when this note was written; it is docs-only and changes no app code. Row 59 is closed: its trunk
   addendum cites run `44048585940` attempt 2 at `86fce44`. Do not re-record
   row 59 to land this guard.
 - The guard is two commits on `phase-59-rail-sweep`, tip `94d04d6` whose
