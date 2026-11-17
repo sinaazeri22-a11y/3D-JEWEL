@@ -102,20 +102,27 @@ final class Phase59RailSweepTests: XCTestCase {
             isClosed: true
         )
         let rail = try FFRailPath(points: [point(0, 0), point(50, 0)])
+        // A fixed section twists about +Z, which is the only frame in which the
+        // far ring's corners are exact numbers rather than a derived basis.
         let plain = try FFRailSweep(
             profile: profile,
             rail: rail,
-            parameters: FFRailSweepParameters()
+            parameters: FFRailSweepParameters(orientation: .fixed)
         ).mesh()
         let twisted = try FFRailSweep(
             profile: profile,
             rail: rail,
-            parameters: FFRailSweepParameters(twistDegrees: 90)
+            parameters: FFRailSweepParameters(twistDegrees: 90, orientation: .fixed)
         ).mesh()
 
+        // The near end is the untouched section, and the far end is that same
+        // section turned a quarter turn about the centreline: no vertex is left
+        // where it was, and every corner lands where a 90 deg rotation puts it.
         assertVec3(twisted.positions[0], plain.positions[0])
-        XCTAssertGreaterThan(twisted.positions[4].distance(to: plain.positions[4]), 1)
-        XCTAssertEqual(twisted.signedVolume(), plain.signedVolume(), accuracy: 1e-6)
+        assertVec3(twisted.positions[4], Vec3(x: 53, y: -5, z: 0))
+        assertVec3(twisted.positions[5], Vec3(x: 53, y: 5, z: 0))
+        assertVec3(twisted.positions[6], Vec3(x: 47, y: 5, z: 0))
+        assertVec3(twisted.positions[7], Vec3(x: 47, y: -5, z: 0))
     }
 
     func testEndScaleGrowsTheFarSectionAboutTheCentreline() throws {
@@ -124,10 +131,12 @@ final class Phase59RailSweepTests: XCTestCase {
             isClosed: true
         )
         let rail = try FFRailPath(points: [point(0, 0), point(50, 0)])
+        // Fixed orientation keeps the section's world axes, so the scaled
+        // corners are the drawn ones grown about the centroid.
         let mesh = try FFRailSweep(
             profile: profile,
             rail: rail,
-            parameters: FFRailSweepParameters(endScale: 2)
+            parameters: FFRailSweepParameters(endScale: 2, orientation: .fixed)
         ).mesh()
         assertVec3(mesh.positions[0], Vec3(x: -5, y: -3, z: 0))
         assertVec3(mesh.positions[4], Vec3(x: 40, y: -6, z: 0))
